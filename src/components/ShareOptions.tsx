@@ -1,10 +1,11 @@
 
 "use client";
 
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Mail as MailIcon, MessageSquare } from 'lucide-react';
+import { Copy, Mail as MailIcon, MessageSquare, Share2 as ShareIcon } from 'lucide-react';
 
 interface ShareOptionsProps {
   cardUrl: string;
@@ -12,6 +13,13 @@ interface ShareOptionsProps {
 
 export function ShareOptions({ cardUrl }: ShareOptionsProps) {
   const { toast } = useToast();
+  const [isWebShareSupported, setIsWebShareSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      setIsWebShareSupported(true);
+    }
+  }, []);
 
   const copyToClipboard = () => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -53,8 +61,48 @@ export function ShareOptions({ cardUrl }: ShareOptionsProps) {
     }
   };
 
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'My Digital Business Card',
+          text: 'Check out my digital business card:',
+          url: cardUrl,
+        });
+        toast({
+          title: 'Shared!',
+          description: 'Your card has been shared.',
+        });
+      } catch (error) {
+        // Check if the error is due to user aborting the share
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          // User cancelled the share, no toast needed or a very subtle one
+          console.log('Share cancelled by user.');
+        } else {
+          console.error('Error sharing natively:', error);
+          toast({
+            title: 'Share Error',
+            description: 'Could not share your card using the native share. Please try another method.',
+            variant: 'destructive',
+          });
+        }
+      }
+    } else {
+      toast({
+        title: 'Not Supported',
+        description: 'Native sharing is not supported on this browser. Try copying the link.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-4 pt-2">
+      {isWebShareSupported && (
+        <Button onClick={handleNativeShare} className="w-full">
+          <ShareIcon className="mr-2 h-4 w-4" /> Share via App...
+        </Button>
+      )}
       <div>
         <label htmlFor="shareOptionsCardUrlInput" className="block text-sm font-medium text-foreground mb-1">Your Card URL</label>
         <div className="flex space-x-2">
@@ -78,4 +126,3 @@ export function ShareOptions({ cardUrl }: ShareOptionsProps) {
     </div>
   );
 }
-
