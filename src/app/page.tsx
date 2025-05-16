@@ -41,32 +41,80 @@ export default function HomePage() {
   useEffect(() => {
     if (isClient) {
       const cardIdentifier = sanitizeForUrl(userProfile.name);
-      setCardDesign(prev => ({
-        ...prev,
-        qrCodeUrl: `${window.location.origin}/card/${cardIdentifier}`
-      }));
+      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}`;
+      setCardDesign(prev => {
+        if (prev.qrCodeUrl !== newQrCodeUrl) {
+          return { ...prev, qrCodeUrl: newQrCodeUrl };
+        }
+        return prev;
+      });
     }
   }, [userProfile.name, isClient]);
 
 
-  const handleProfileChange = useCallback((newProfile: UserProfile) => {
-    setUserProfile(prevProfile => ({ ...prevProfile, ...newProfile }));
+  const handleProfileChange = useCallback((newProfileData: Partial<UserProfile>) => {
+    setUserProfile(currentProfile => {
+      const potentialNextProfile = { ...currentProfile, ...newProfileData };
+      let hasActuallyChanged = false;
+      const allKeys = new Set([...Object.keys(currentProfile), ...Object.keys(potentialNextProfile)]) as Set<keyof UserProfile>;
+
+      for (const key of allKeys) {
+        if (currentProfile[key] !== potentialNextProfile[key]) {
+          hasActuallyChanged = true;
+          break;
+        }
+      }
+
+      if (hasActuallyChanged) {
+        return potentialNextProfile;
+      }
+      return currentProfile;
+    });
   }, []);
 
-  const handleDesignChange = useCallback((newDesign: CardDesignSettings) => {
-    setCardDesign(prevDesign => ({ ...prevDesign, ...newDesign }));
-  }, []);
+  const handleDesignChange = useCallback((newDesignData: Partial<CardDesignSettings>) => {
+    setCardDesign(currentDesign => {
+        const potentialNextDesign = { ...currentDesign, ...newDesignData };
+        
+        // Simple shallow comparison for top-level properties
+        let hasActuallyChanged = false;
+        const topLevelKeys = ['template', 'layout', 'qrCodeUrl'] as const;
+        for (const key of topLevelKeys) {
+            if (currentDesign[key] !== potentialNextDesign[key]) {
+                hasActuallyChanged = true;
+                break;
+            }
+        }
+
+        // Compare colorScheme separately
+        if (!hasActuallyChanged && potentialNextDesign.colorScheme) {
+            const currentColorScheme = currentDesign.colorScheme || {};
+            const nextColorScheme = potentialNextDesign.colorScheme;
+            const colorSchemeKeys = ['cardBackground', 'textColor', 'primaryColor'] as const;
+            for (const key of colorSchemeKeys) {
+                if (currentColorScheme[key] !== nextColorScheme[key]) {
+                    hasActuallyChanged = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasActuallyChanged) {
+            return potentialNextDesign;
+        }
+        return currentDesign;
+    });
+}, []);
   
   const handleAiApplySuggestions = useCallback((suggestedDesign: Partial<CardDesignSettings>) => {
     setCardDesign(prev => {
-      const newColorScheme = {
-        ...prev.colorScheme,
-        ...(suggestedDesign.colorScheme || {}),
-      };
+      const newColorSchemePartial = suggestedDesign.colorScheme || {};
+      const currentColorScheme = prev.colorScheme || { cardBackground: '', textColor: '', primaryColor: '' }; // Ensure currentColorScheme is defined
+
       const finalColorScheme = {
-        cardBackground: newColorScheme.cardBackground || prev.colorScheme.cardBackground,
-        textColor: newColorScheme.textColor || prev.colorScheme.textColor,
-        primaryColor: newColorScheme.primaryColor || prev.colorScheme.primaryColor,
+        cardBackground: newColorSchemePartial.cardBackground || currentColorScheme.cardBackground,
+        textColor: newColorSchemePartial.textColor || currentColorScheme.textColor,
+        primaryColor: newColorSchemePartial.primaryColor || currentColorScheme.primaryColor,
       };
       
       return {
@@ -84,7 +132,7 @@ export default function HomePage() {
   const handleTemplateSelect = useCallback((templateId: string) => {
     const selected = appTemplates.find(t => t.id === templateId);
     if (selected) {
-      setUserProfile(selected.profile);
+      setUserProfile(selected.profile); // This will trigger the more robust handleProfileChange logic internally if used via form
       setCardDesign(selected.design); 
       setSelectedTemplateId(templateId);
     }
