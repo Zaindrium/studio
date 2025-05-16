@@ -20,52 +20,95 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Placeholder data for a single team and its members/templates
-const MOCK_TEAM_DETAILS = {
-  id: 'team1',
-  name: 'Sales Team Alpha',
-  description: 'Focused on enterprise client acquisition and regional sales targets.',
-  manager: 'Alice Smith',
-  members: [
-    { id: 'user1', name: 'John Doe', role: 'Sales Rep', email: 'john.doe@example.com' },
-    { id: 'user2', name: 'Jane Roe', role: 'Sales Lead', email: 'jane.roe@example.com' },
-    { id: 'user3', name: 'Mike Chan', role: 'Account Manager', email: 'mike.chan@example.com' },
-  ],
-  assignedTemplates: [
-    { id: 'templateA', name: 'Enterprise Sales Card' },
-    { id: 'templateB', name: 'Networking Event Card (Sales)' },
-  ],
-  teamMetrics: {
-    cardsCreated: 45,
-    averageSharesPerCard: 12,
-    leadsGenerated: 150, 
-    activeMembers: 3,
+// Placeholder data for a list of detailed teams for this page
+const MOCK_DETAILED_TEAMS_DATA = [
+  {
+    id: 'team1',
+    name: 'Sales Team Alpha',
+    description: 'Focused on enterprise client acquisition and regional sales targets.',
+    manager: 'Alice Smith',
+    members: [
+      { id: 'user1', name: 'John Doe', role: 'Sales Rep', email: 'john.doe@example.com' },
+      { id: 'user2', name: 'Jane Roe', role: 'Sales Lead', email: 'jane.roe@example.com' },
+      { id: 'user3', name: 'Mike Chan', role: 'Account Manager', email: 'mike.chan@example.com' },
+    ],
+    assignedTemplates: [
+      { id: 'templateA', name: 'Enterprise Sales Card' },
+      { id: 'templateB', name: 'Networking Event Card (Sales)' },
+    ],
+    teamMetrics: {
+      cardsCreated: 45,
+      averageSharesPerCard: 12,
+      leadsGenerated: 150,
+      activeMembers: 3,
+    }
+  },
+  {
+    id: 'team2',
+    name: 'Marketing Crew Gamma',
+    description: 'Digital marketing, content creation, and brand management.',
+    manager: 'Bob Johnson',
+    members: [
+      { id: 'user4', name: 'Sarah Lee', role: 'Content Strategist', email: 'sarah.lee@example.com' },
+      { id: 'user5', name: 'Tom Wilson', role: 'SEO Specialist', email: 'tom.wilson@example.com' },
+    ],
+    assignedTemplates: [
+      { id: 'templateC', name: 'Brand Awareness Card' },
+    ],
+    teamMetrics: {
+      cardsCreated: 30,
+      averageSharesPerCard: 18,
+      leadsGenerated: 95,
+      activeMembers: 2,
+    }
+  },
+  // Add more detailed mock teams here if needed for testing
+  {
+    id: 'team3',
+    name: 'Engineering Squad Beta',
+    description: 'Product development and R&D for core platform features.',
+    manager: 'Carol White',
+    members: [
+      { id: 'user6', name: 'David Kim', role: 'Backend Developer', email: 'david.kim@example.com' },
+      { id: 'user7', name: 'Laura Chen', role: 'Frontend Developer', email: 'laura.chen@example.com' },
+      { id: 'user8', name: 'Kevin Green', role: 'QA Engineer', email: 'kevin.green@example.com' },
+    ],
+    assignedTemplates: [
+      { id: 'templateD', name: 'Developer Profile Card' },
+    ],
+    teamMetrics: {
+      cardsCreated: 15,
+      averageSharesPerCard: 5,
+      leadsGenerated: 10, // Less direct lead gen for engineering
+      activeMembers: 3,
+    }
   }
-};
+];
 
 export default function TeamDetailPage() {
   const params = useParams();
   const teamId = params.teamId as string;
   const { toast } = useToast();
 
-  // In a real app, fetch team details based on teamId
-  const team = MOCK_TEAM_DETAILS; // Using mock data
+  // Find the team from the MOCK_DETAILED_TEAMS_DATA array
+  const team = MOCK_DETAILED_TEAMS_DATA.find(t => t.id === teamId);
 
   const handleDeleteTeam = () => {
     // Placeholder for actual delete logic
     console.log(`Attempting to delete team ${teamId}`);
     toast({
       title: "Team Deletion Initiated",
-      description: `Team "${team.name}" would be deleted. (This is a simulation)`,
+      description: `Team "${team?.name}" would be deleted. (This is a simulation)`,
       variant: "destructive",
     });
+    // In a real app, you would also navigate away or update the list of teams
   };
 
-  if (!team || team.id !== teamId) { // Basic check for mock data
+  if (!team) { // Check if the team was found
     return (
       <div className="text-center py-10">
         <h1 className="text-2xl font-semibold">Team Not Found</h1>
-        <p className="text-muted-foreground">The team you are looking for does not exist or could not be loaded.</p>
+        <p className="text-muted-foreground">The team with ID "{teamId}" does not exist or could not be loaded.</p>
         <Button asChild variant="link" className="mt-4">
           <Link href="/dashboard/teams">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Teams
@@ -89,8 +132,8 @@ export default function TeamDetailPage() {
           <p className="text-sm text-muted-foreground mt-1">Managed by: {team.manager}</p>
         </div>
         {/* This button would typically open a modal/dialog to edit team name, description, manager */}
-        <Button variant="outline"> 
-          <Edit className="mr-2 h-4 w-4" /> Edit Team Details 
+        <Button variant="outline">
+          <Edit className="mr-2 h-4 w-4" /> Edit Team Details
         </Button>
       </div>
 
@@ -151,7 +194,7 @@ export default function TeamDetailPage() {
           </CardFooter>
         </Card>
       </div>
-      
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -165,7 +208,7 @@ export default function TeamDetailPage() {
             <div className="flex justify-between items-center p-2 rounded bg-secondary/20"><span>Leads Generated (Example):</span> <span className="font-semibold text-lg">{team.teamMetrics.leadsGenerated}</span></div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center"><Settings className="mr-2 h-5 w-5 text-primary"/>Team Settings & Actions</CardTitle>
@@ -217,3 +260,4 @@ export default function TeamDetailPage() {
   );
 }
 
+    
