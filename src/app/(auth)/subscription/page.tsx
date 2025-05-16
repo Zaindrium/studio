@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { CheckCircle, Star, Users, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan'; // Import hook and PlanId
+import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 const plans = [
   {
-    id: 'free',
+    id: 'free' as PlanId,
     name: 'Personal Free',
     price: '$0',
     frequency: '/ month',
@@ -18,7 +21,7 @@ const plans = [
     isBusiness: false,
   },
   {
-    id: 'starter',
+    id: 'starter' as PlanId,
     name: 'Business Starter',
     price: '$19',
     frequency: '/ month',
@@ -27,7 +30,7 @@ const plans = [
     isBusiness: true,
   },
   {
-    id: 'growth',
+    id: 'growth' as PlanId,
     name: 'Business Growth',
     price: '$49',
     frequency: '/ month',
@@ -37,7 +40,7 @@ const plans = [
     popular: true,
   },
   {
-    id: 'enterprise',
+    id: 'enterprise' as PlanId,
     name: 'Business Enterprise',
     price: 'Contact Us',
     frequency: '',
@@ -48,28 +51,47 @@ const plans = [
 ];
 
 export default function SubscriptionPage() {
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(plans[1].id); // Default to Business Starter
-  const [isLoading, setIsLoading] = useState(false);
+  const { currentPlan: activePlanId, setCurrentPlan, isLoading: isPlanLoading } = useCurrentPlan();
+  const { toast } = useToast();
+  const router = useRouter();
+  
+  // Use activePlanId from the hook for initial selection if not loading, otherwise fallback or default.
+  const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // This page could be shown after business signup or when changing plans.
-  // It might need context about whether it's an initial signup or an upgrade/downgrade.
+  React.useEffect(() => {
+    if (!isPlanLoading && activePlanId) {
+      setSelectedPlanId(activePlanId);
+    } else if (!isPlanLoading && !activePlanId) {
+        setSelectedPlanId(plans[1].id); // Default to starter if no plan set
+    }
+  }, [activePlanId, isPlanLoading]);
 
-  const handleSelectPlan = (planId: string) => {
-    setSelectedPlanId(planId);
-    // In a real app, you might store this selection in a global state or pass it to the next step.
-  };
 
   const handleProceedToPayment = async () => {
     if (!selectedPlanId) return;
-    setIsLoading(true);
-    // Placeholder for actual subscription/payment processing
-    console.log("Proceeding to payment for plan:", selectedPlanId);
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-    // On success, redirect to dashboard or next step.
-    setIsLoading(false);
-    // In a real app, you would likely redirect to the dashboard or a payment confirmation page.
-    // For now, this button is a placeholder.
+    setIsProcessing(true);
+    
+    const selectedPlanDetails = plans.find(p => p.id === selectedPlanId);
+
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
+
+    setCurrentPlan(selectedPlanId); // Update plan in localStorage via hook
+
+    toast({
+      title: `Plan Selected: ${selectedPlanDetails?.name || 'Selected Plan'}`,
+      description: selectedPlanId === 'free' ? "You're now on the Free plan!" : "Your subscription has been updated. Redirecting...",
+    });
+
+    setIsProcessing(false);
+    // Redirect to dashboard after plan selection
+    router.push('/dashboard'); 
   };
+
+  if (isPlanLoading) {
+    return <div className="w-full max-w-5xl mx-auto py-8 px-4 text-center">Loading plans...</div>;
+  }
 
   return (
     <div className="w-full max-w-5xl mx-auto py-8 px-4">
@@ -109,14 +131,14 @@ export default function SubscriptionPage() {
                   </li>
                 ))}
               </ul>
-               <p className="text-xs text-muted-foreground mt-4">
+               <p className="text-xs text-muted-foreground mt-4"> {/* Increased mt-2 to mt-4 */}
                 {plan.isBusiness ? <Users className="inline h-3 w-3 mr-1"/> : null }
                 {plan.userLimit === Infinity ? 'Unlimited Users' : `Up to ${plan.userLimit} User${plan.userLimit > 1 ? 's' : ''}`}
               </p>
             </CardContent>
             <CardFooter>
               <Button 
-                onClick={() => handleSelectPlan(plan.id)}
+                onClick={() => setSelectedPlanId(plan.id)}
                 className="w-full"
                 variant={selectedPlanId === plan.id ? "default" : "outline"}
                 disabled={plan.price === 'Contact Us'}
@@ -132,11 +154,11 @@ export default function SubscriptionPage() {
         <Button 
           size="lg" 
           onClick={handleProceedToPayment} 
-          disabled={!selectedPlanId || isLoading || plans.find(p=>p.id === selectedPlanId)?.price === 'Contact Us'}
+          disabled={!selectedPlanId || isProcessing || plans.find(p=>p.id === selectedPlanId)?.price === 'Contact Us'}
           className="min-w-[200px]"
         >
           <CreditCard className="mr-2 h-5 w-5" />
-          {isLoading ? 'Processing...' : (selectedPlanId === 'free' ? 'Start with Free Plan' : 'Proceed to Payment')}
+          {isProcessing ? 'Processing...' : (selectedPlanId === 'free' ? 'Start with Free Plan' : 'Proceed to Payment')}
         </Button>
          <p className="text-xs text-muted-foreground mt-2">
           Secure payment processing. You can change your plan later.

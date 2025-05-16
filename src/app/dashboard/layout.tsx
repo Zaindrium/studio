@@ -1,11 +1,9 @@
 
 "use client";
 
-import React from 'react';
-// Fonts are handled by the root layout
+import React, { useEffect, useState } from 'react'; // Added useEffect and useState
 import '../globals.css';
-// Toaster is handled by the root layout
-import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart } from 'lucide-react';
+import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock } from 'lucide-react'; // Added Lock
 import {
   Sidebar,
   SidebarProvider,
@@ -21,8 +19,9 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
 import Link from 'next/link';
+import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan'; // Import useCurrentPlan
 
 // Simulated user data - replace with actual auth context later
 const MOCK_USER = {
@@ -38,13 +37,12 @@ const sidebarNavItems = [
   { href: '/dashboard/users', label: 'Users', icon: UserCog },
   { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard },
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
-  { href: '/dashboard/generator', label: 'Generator', icon: Blocks },
-  { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart },
+  { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true }, // Mark as premium
+  { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true }, // Mark as premium
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  // { href: '/dashboard/files', label: 'Files', icon: FolderArchive }, // Files section removed
   { href: '/dashboard/administrators', label: 'Administrators', icon: Building },
-  { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound },
-  { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle },
+  { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true }, // Mark as premium
+  { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true }, // Mark as premium
   { href: '/dashboard/license', label: 'License Management', icon: CreditCard },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
@@ -56,21 +54,28 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const user = MOCK_USER;
+  const { currentPlan, isLoading: isPlanLoading } = useCurrentPlan();
+  const [activePlan, setActivePlan] = useState<PlanId | null>(null);
 
-  // Concept for handling premium features (would require global state)
-  // const currentPlan = "free"; // This would come from global state/context
-  // const isPremiumFeature = (href: string) => {
-  //   const premiumRoutes = ['/dashboard/generator', '/dashboard/integrations', '/dashboard/physical-cards'];
-  //   return premiumRoutes.includes(href);
-  // };
+  useEffect(() => {
+    if (!isPlanLoading && currentPlan) {
+      setActivePlan(currentPlan);
+    }
+  }, [currentPlan, isPlanLoading]);
+
+  const handleLogout = () => {
+    // Add actual logout logic here (e.g., clear tokens, call API)
+    router.push('/login');
+  };
 
   return (
     <SidebarProvider defaultOpen>
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar className="border-r border-sidebar-border" collapsible="icon">
           <SidebarHeader className="p-4 flex items-center space-x-3">
-              <Link href="/dashboard" className="flex items-center no-underline hover:opacity-90"> {/* Changed href to /dashboard */}
+              <Link href="/dashboard" className="flex items-center no-underline hover:opacity-90">
                 <LinkIcon className="h-7 w-7 text-primary" />
                 <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">LinkUP</span>
               </Link>
@@ -78,22 +83,30 @@ export default function DashboardLayout({
           <SidebarContent className="p-2">
             <SidebarMenu>
               {sidebarNavItems.map((item) => {
-                // const isDisabled = currentPlan === 'free' && isPremiumFeature(item.href);
+                const isPremiumLocked = activePlan === 'free' && item.isPremium;
+                const effectiveLabel = item.label + (isPremiumLocked ? " (Premium)" : "");
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <Link href={item.href} legacyBehavior passHref>
+                    <Link href={isPremiumLocked ? "#" : item.href} legacyBehavior passHref>
                       <SidebarMenuButton
                         tooltip={{
-                          children: item.label, //  + (isDisabled ? ' (Premium)' : ''),
+                          children: effectiveLabel,
                           side: "right", 
                           align: "center"
                         }}
-                        isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
-                        // disabled={isDisabled} // This would disable the button
-                        // className={isDisabled ? 'opacity-50 cursor-not-allowed' : ''} // This would grey it out
+                        isActive={!isPremiumLocked && (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)))}
+                        disabled={isPremiumLocked}
+                        className={isPremiumLocked ? 'opacity-60 cursor-not-allowed hover:bg-transparent hover:text-sidebar-foreground' : ''}
+                        onClick={isPremiumLocked ? (e) => {
+                            e.preventDefault(); 
+                            router.push('/dashboard/license'); // Or '/subscription'
+                        } : undefined}
                       >
                         <item.icon className="h-5 w-5" />
-                        <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                        <span className="group-data-[collapsible=icon]:hidden flex items-center justify-between w-full">
+                          {item.label}
+                          {isPremiumLocked && <Lock className="h-3 w-3 ml-auto text-amber-500" />}
+                        </span>
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
@@ -113,7 +126,7 @@ export default function DashboardLayout({
                 <p className="text-xs text-muted-foreground">{user.organizationName}</p>
               </div>
             </div>
-              <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-2">
+              <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-2" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4 group-data-[collapsible=icon]:mr-0" />
                 <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
               </Button>
