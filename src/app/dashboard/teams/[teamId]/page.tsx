@@ -39,6 +39,8 @@ interface TeamMember {
   name: string;
   role: string;
   email: string;
+  cardsCreatedCount: number; 
+  averageSharesPerCard: number; 
 }
 
 interface AssignedTemplate {
@@ -67,11 +69,9 @@ interface OrganizationUser {
   id: string;
   name: string;
   email: string;
-  // Add other relevant user fields if necessary for selection logic
 }
 
 
-// Placeholder data for a list of detailed teams for this page
 const MOCK_DETAILED_TEAMS_DATA: DetailedTeam[] = [
   {
     id: 'team1',
@@ -79,19 +79,19 @@ const MOCK_DETAILED_TEAMS_DATA: DetailedTeam[] = [
     description: 'Focused on enterprise client acquisition and regional sales targets.',
     manager: 'Alice Smith',
     members: [
-      { id: 'user1', name: 'John Doe', role: 'Sales Rep', email: 'john.doe@example.com' },
-      { id: 'user2', name: 'Jane Roe', role: 'Sales Lead', email: 'jane.roe@example.com' },
-      { id: 'user3', name: 'Mike Chan', role: 'Account Manager', email: 'mike.chan@example.com' },
+      { id: 'user1', name: 'John Doe', role: 'Sales Rep', email: 'john.doe@example.com', cardsCreatedCount: 10, averageSharesPerCard: 15 },
+      { id: 'user2', name: 'Jane Roe', role: 'Sales Lead', email: 'jane.roe@example.com', cardsCreatedCount: 8, averageSharesPerCard: 20 },
+      { id: 'user3', name: 'Mike Chan', role: 'Account Manager', email: 'mike.chan@example.com', cardsCreatedCount: 12, averageSharesPerCard: 10 },
     ],
     assignedTemplates: [
       { id: 'templateA', name: 'Enterprise Sales Card' },
       { id: 'templateB', name: 'Networking Event Card (Sales)' },
     ],
-    teamMetrics: {
-      cardsCreated: 45,
-      averageSharesPerCard: 12,
-      leadsGenerated: 150,
-      activeMembers: 3,
+    teamMetrics: { 
+      cardsCreated: 0,
+      averageSharesPerCard: 0,
+      leadsGenerated: 150, 
+      activeMembers: 0,
     }
   },
   {
@@ -100,17 +100,17 @@ const MOCK_DETAILED_TEAMS_DATA: DetailedTeam[] = [
     description: 'Digital marketing, content creation, and brand management.',
     manager: 'Bob Johnson',
     members: [
-      { id: 'user4', name: 'Sarah Lee', role: 'Content Strategist', email: 'sarah.lee@example.com' },
-      { id: 'user5', name: 'Tom Wilson', role: 'SEO Specialist', email: 'tom.wilson@example.com' },
+      { id: 'user4', name: 'Sarah Lee', role: 'Content Strategist', email: 'sarah.lee@example.com', cardsCreatedCount: 5, averageSharesPerCard: 25 },
+      { id: 'user5', name: 'Tom Wilson', role: 'SEO Specialist', email: 'tom.wilson@example.com', cardsCreatedCount: 7, averageSharesPerCard: 18 },
     ],
     assignedTemplates: [
       { id: 'templateC', name: 'Brand Awareness Card' },
     ],
     teamMetrics: {
-      cardsCreated: 30,
-      averageSharesPerCard: 18,
-      leadsGenerated: 95,
-      activeMembers: 2,
+      cardsCreated: 0,
+      averageSharesPerCard: 0,
+      leadsGenerated: 95, 
+      activeMembers: 0,
     }
   },
   {
@@ -119,18 +119,18 @@ const MOCK_DETAILED_TEAMS_DATA: DetailedTeam[] = [
     description: 'Product development and R&D for core platform features.',
     manager: 'Carol White',
     members: [
-      { id: 'user6', name: 'David Kim', role: 'Backend Developer', email: 'david.kim@example.com' },
-      { id: 'user7', name: 'Laura Chen', role: 'Frontend Developer', email: 'laura.chen@example.com' },
-      { id: 'user8', name: 'Kevin Green', role: 'QA Engineer', email: 'kevin.green@example.com' },
+      { id: 'user6', name: 'David Kim', role: 'Backend Developer', email: 'david.kim@example.com', cardsCreatedCount: 2, averageSharesPerCard: 3 },
+      { id: 'user7', name: 'Laura Chen', role: 'Frontend Developer', email: 'laura.chen@example.com', cardsCreatedCount: 3, averageSharesPerCard: 6 },
+      { id: 'user8', name: 'Kevin Green', role: 'QA Engineer', email: 'kevin.green@example.com', cardsCreatedCount: 1, averageSharesPerCard: 2 },
     ],
     assignedTemplates: [
       { id: 'templateD', name: 'Developer Profile Card' },
     ],
     teamMetrics: {
-      cardsCreated: 15,
-      averageSharesPerCard: 5,
-      leadsGenerated: 10,
-      activeMembers: 3,
+      cardsCreated: 0,
+      averageSharesPerCard: 0,
+      leadsGenerated: 10, 
+      activeMembers: 0,
     }
   }
 ];
@@ -160,13 +160,38 @@ export default function TeamDetailPage() {
   const [currentTeam, setCurrentTeam] = useState<DetailedTeam | null>(null);
   const [isManageMembersDialogOpen, setIsManageMembersDialogOpen] = useState(false);
   
+  const calculateTeamMetrics = (team: DetailedTeam | null): TeamMetrics => {
+    if (!team || !team.members || team.members.length === 0) {
+      return {
+        cardsCreated: 0,
+        averageSharesPerCard: 0,
+        leadsGenerated: team?.teamMetrics.leadsGenerated || 0,
+        activeMembers: 0,
+      };
+    }
+
+    const totalCardsCreated = team.members.reduce((sum, member) => sum + (member.cardsCreatedCount || 0), 0);
+    
+    let totalSumOfAverageShares = 0;
+    team.members.forEach(member => {
+      totalSumOfAverageShares += (member.averageSharesPerCard || 0);
+    });
+    const overallAverageShares = team.members.length > 0 ? totalSumOfAverageShares / team.members.length : 0;
+
+    return {
+      cardsCreated: totalCardsCreated,
+      averageSharesPerCard: parseFloat(overallAverageShares.toFixed(1)),
+      leadsGenerated: team.teamMetrics.leadsGenerated, 
+      activeMembers: team.members.length,
+    };
+  };
+
   useEffect(() => {
     const foundTeam = MOCK_DETAILED_TEAMS_DATA.find(t => t.id === teamId);
-    // Deep copy to prevent direct mutation of mock data if needed for other parts,
-    // or ensure MOCK_DETAILED_TEAMS_DATA is not mutated elsewhere.
-    // For this simulation, a shallow copy of members is fine for add/remove.
     if (foundTeam) {
-      setCurrentTeam({ ...foundTeam, members: [...foundTeam.members] });
+      const initialTeamData = JSON.parse(JSON.stringify(foundTeam)); // Deep copy
+      initialTeamData.teamMetrics = calculateTeamMetrics(initialTeamData);
+      setCurrentTeam(initialTeamData);
     } else {
       setCurrentTeam(null);
     }
@@ -179,8 +204,6 @@ export default function TeamDetailPage() {
       description: `Team "${currentTeam?.name}" would be deleted. (This is a simulation)`,
       variant: "destructive",
     });
-    // In a real app, navigate away or update a global list of teams
-    // For simulation, let's redirect back to the teams list
     router.push('/dashboard/teams');
   };
 
@@ -189,14 +212,16 @@ export default function TeamDetailPage() {
     const memberToRemove = currentTeam.members.find(m => m.id === memberId);
     setCurrentTeam(prevTeam => {
       if (!prevTeam) return null;
-      return {
+      const updatedTeam = {
         ...prevTeam,
         members: prevTeam.members.filter(m => m.id !== memberId),
       };
+      updatedTeam.teamMetrics = calculateTeamMetrics(updatedTeam);
+      return updatedTeam;
     });
     toast({
       title: "Member Removed",
-      description: `${memberToRemove?.name || 'Member'} has been removed from the team. (Simulation)`,
+      description: `${memberToRemove?.name || 'Member'} has been removed. Team metrics updated. (Simulation)`,
     });
   };
 
@@ -209,17 +234,21 @@ export default function TeamDetailPage() {
         name: userToAdd.name,
         email: userToAdd.email,
         role: 'Member', // Default role
+        cardsCreatedCount: 0, // Default for new member
+        averageSharesPerCard: 0, // Default for new member
       };
       setCurrentTeam(prevTeam => {
         if (!prevTeam) return null;
-        return {
+        const updatedTeam = {
           ...prevTeam,
           members: [...prevTeam.members, newMember],
         };
+        updatedTeam.teamMetrics = calculateTeamMetrics(updatedTeam);
+        return updatedTeam;
       });
       toast({
         title: "Member Added",
-        description: `${userToAdd.name} has been added to the team. (Simulation)`,
+        description: `${userToAdd.name} has been added to the team. Team metrics updated. (Simulation)`,
       });
     }
   };
@@ -234,7 +263,6 @@ export default function TeamDetailPage() {
       <div className="text-center py-10">
         <h1 className="text-2xl font-semibold">Loading Team Data...</h1>
         <p className="text-muted-foreground">If the team is not found, you will be redirected.</p>
-        {/* Potentially add a redirect if not found after a timeout or based on an error state */}
       </div>
     );
   }
@@ -273,7 +301,6 @@ export default function TeamDetailPage() {
                       <span className="font-medium">{member.name}</span> <Badge variant="outline" className="ml-2 text-xs">{member.role}</Badge>
                       <p className="text-xs text-muted-foreground">{member.email}</p>
                     </div>
-                    {/* Removed individual edit/remove buttons for now, handled by dialog */}
                   </li>
                 ))}
               </ul>
@@ -318,9 +345,8 @@ export default function TeamDetailPage() {
         </Card>
       </div>
 
-      {/* Manage Members Dialog */}
       <Dialog open={isManageMembersDialogOpen} onOpenChange={setIsManageMembersDialogOpen}>
-        <DialogContent className="sm:max-w-2xl"> {/* Wider dialog */}
+        <DialogContent className="sm:max-w-2xl"> 
           <DialogHeader>
             <DialogTitle>Manage Team Members for "{currentTeam.name}"</DialogTitle>
             <DialogDescription>
@@ -328,7 +354,6 @@ export default function TeamDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[60vh] overflow-y-hidden">
-            {/* Current Members */}
             <div className="space-y-3">
               <h3 className="text-lg font-medium text-foreground">Current Members ({currentTeam.members.length})</h3>
               <ScrollArea className="h-[45vh] rounded-md border p-3">
@@ -352,7 +377,6 @@ export default function TeamDetailPage() {
               </ScrollArea>
             </div>
 
-            {/* Available Users to Add */}
             <div className="space-y-3">
               <h3 className="text-lg font-medium text-foreground">Available Organization Users ({availableUsersToAdd.length})</h3>
                <ScrollArea className="h-[45vh] rounded-md border p-3">
