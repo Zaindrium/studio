@@ -9,10 +9,10 @@ import { CardPreview } from '@/components/CardPreview';
 import { CardDesigner } from '@/components/CardDesigner';
 import { AiDesignAssistant } from '@/components/AiDesignAssistant';
 import { ShareCard } from '@/components/ShareCard';
-import { TemplatePicker } from '@/components/TemplatePicker';
+// import { TemplatePicker } from '@/components/TemplatePicker'; // Removed TemplatePicker import
 import { OnboardingDialog } from '@/components/OnboardingDialog';
 import { QuickShareFAB } from '@/components/QuickShareFAB'; // Added
-import type { UserProfile, CardDesignSettings, AppTemplate } from '@/lib/types';
+import type { UserProfile, CardDesignSettings } from '@/lib/types'; // Removed AppTemplate import as it's only used for initialTemplate
 import { appTemplates } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { sanitizeForUrl } from '@/lib/utils';
@@ -24,7 +24,7 @@ const ONBOARDING_STORAGE_KEY = 'linkup_onboarding_completed';
 export default function HomePage() {
   const [userProfile, setUserProfile] = useState<UserProfile>(initialTemplate.profile);
   const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplate.id);
+  // const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplate.id); // Removed selectedTemplateId state
   const [isClient, setIsClient] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -86,7 +86,7 @@ export default function HomePage() {
         }
 
         if (!hasActuallyChanged && potentialNextDesign.colorScheme) {
-            const currentColorScheme = currentDesign.colorScheme || {};
+            const currentColorScheme = currentDesign.colorScheme || { cardBackground: '', textColor: '', primaryColor: '' };
             const nextColorScheme = potentialNextDesign.colorScheme;
             const colorSchemeKeys = ['cardBackground', 'textColor', 'primaryColor'] as const;
             for (const key of colorSchemeKeys) {
@@ -123,24 +123,19 @@ export default function HomePage() {
     });
   }, []);
 
-  const handleUpdateProfileForAI = useCallback((aiData: Partial<UserProfile>) => { // Modified to accept Partial<UserProfile>
-    // This function is used by AiDesignAssistant to update parts of the UserProfile,
-    // like 'userInfo' or 'cardBackgroundUrl' from AI suggestions/generations.
-    // It directly calls handleProfileChange to ensure consistent update logic.
+  const handleUpdateProfileForAI = useCallback((aiData: Partial<UserProfile>) => { 
     handleProfileChange(aiData);
   }, [handleProfileChange]);
 
 
-  const handleTemplateSelect = useCallback((templateId: string) => {
-    const selected = appTemplates.find(t => t.id === templateId);
-    if (selected) {
-      // Use handleProfileChange to ensure consistent update logic & prevent loops
-      handleProfileChange(selected.profile);
-      // Use handleDesignChange for similar reasons
-      handleDesignChange(selected.design);
-      setSelectedTemplateId(templateId);
-    }
-  }, [handleProfileChange, handleDesignChange]);
+  // const handleTemplateSelect = useCallback((templateId: string) => { // Removed handleTemplateSelect function
+  //   const selected = appTemplates.find(t => t.id === templateId);
+  //   if (selected) {
+  //     handleProfileChange(selected.profile);
+  //     handleDesignChange(selected.design);
+  //     setSelectedTemplateId(templateId);
+  //   }
+  // }, [handleProfileChange, handleDesignChange]);
 
   const handleOnboardingClose = useCallback(() => { 
     setShowOnboarding(false);
@@ -177,11 +172,13 @@ export default function HomePage() {
       <Header />
       <main className="flex-grow container mx-auto px-4 py-8">
         {isClient && <OnboardingDialog isOpen={showOnboarding} onClose={handleOnboardingClose} />}
+        {/* Removed TemplatePicker component from here
         <TemplatePicker 
           templates={appTemplates} 
           currentTemplateId={selectedTemplateId} 
           onTemplateSelect={handleTemplateSelect} 
-        />
+        /> 
+        */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">
             <UserProfileForm profile={userProfile} onProfileChange={handleProfileChange} />
