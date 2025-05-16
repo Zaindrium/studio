@@ -109,7 +109,7 @@ export default function SubscriptionPage() {
                   </li>
                 ))}
               </ul>
-               <p className="text-xs text-muted-foreground mt-2">
+               <p className="text-xs text-muted-foreground mt-4">
                 {plan.isBusiness ? <Users className="inline h-3 w-3 mr-1"/> : null }
                 {plan.userLimit === Infinity ? 'Unlimited Users' : `Up to ${plan.userLimit} User${plan.userLimit > 1 ? 's' : ''}`}
               </p>
