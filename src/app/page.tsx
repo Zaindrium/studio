@@ -10,7 +10,8 @@ import { CardDesigner } from '@/components/CardDesigner';
 import { AiDesignAssistant } from '@/components/AiDesignAssistant';
 import { ShareCard } from '@/components/ShareCard';
 import { TemplatePicker } from '@/components/TemplatePicker';
-import { OnboardingDialog } from '@/components/OnboardingDialog'; // Added
+import { OnboardingDialog } from '@/components/OnboardingDialog';
+import { QuickShareFAB } from '@/components/QuickShareFAB'; // Added
 import type { UserProfile, CardDesignSettings, AppTemplate } from '@/lib/types';
 import { appTemplates } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +29,7 @@ export default function HomePage() {
   const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplate.id);
   const [isClient, setIsClient] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false); // Added
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -92,7 +93,7 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleOnboardingClose = useCallback(() => { // Added
+  const handleOnboardingClose = useCallback(() => { 
     setShowOnboarding(false);
     if (typeof window !== "undefined") {
         localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
@@ -126,7 +127,7 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-grow container mx-auto px-4 py-8">
-        {isClient && <OnboardingDialog isOpen={showOnboarding} onClose={handleOnboardingClose} />} {/* Added */}
+        {isClient && <OnboardingDialog isOpen={showOnboarding} onClose={handleOnboardingClose} />}
         <TemplatePicker 
           templates={appTemplates} 
           currentTemplateId={selectedTemplateId} 
@@ -149,6 +150,7 @@ export default function HomePage() {
             <ShareCard cardUrl={cardDesign.qrCodeUrl} />
           </div>
         </div>
+        {isClient && <QuickShareFAB cardUrl={cardDesign.qrCodeUrl} />} {/* Added */}
       </main>
       <Footer />
     </div>
