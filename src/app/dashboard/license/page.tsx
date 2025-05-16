@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import Link from 'next/link'; 
+// Removed Link import as button now opens dialog
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, FileText, Repeat, ShieldCheck, Users, CalendarClock, Star, CheckCircle } from 'lucide-react';
@@ -14,8 +14,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  // DialogTrigger, // Not needed if button controls state directly
   DialogClose,
+  DialogFooter, // Added DialogFooter
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
@@ -252,3 +253,4 @@ export default function LicensePage() {
     </div>
   );
 }
+
