@@ -2,7 +2,7 @@
 "use client"; // For client-side hooks and context potentially used by Sidebar
 
 import React, { useState } from 'react';
-import type { Metadata } from 'next';
+// import type { Metadata } from 'next'; // Metadata not used in client component like this
 import { Geist, Geist_Mono } from 'next/font/google';
 import '../globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -17,12 +17,12 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
+  // SidebarMenuSub, // Not used directly, items are flat
+  // SidebarMenuSubItem, // Not used directly
+  // SidebarMenuSubButton, // Not used directly
   SidebarSeparator,
   SidebarInset,
-} from "@/components/ui/sidebar"; // Assuming a sidebar component exists or will be created
+} from "@/components/ui/sidebar";
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
@@ -46,11 +46,6 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 });
-
-// export const metadata: Metadata = { // Metadata needs to be handled differently for client components
-//   title: 'LinkUP Business Dashboard',
-//   description: 'Manage your LinkUP business account.',
-// };
 
 const sidebarNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -91,7 +86,7 @@ export default function DashboardLayout({
           <div className="flex min-h-screen">
             <Sidebar className="border-r border-sidebar-border" collapsible="icon">
               <SidebarHeader className="p-4 flex items-center space-x-3">
-                 <Link href="/" className="flex items-center">
+                 <Link href="/editor" className="flex items-center"> {/* Updated href to /editor */}
                     <LinkIcon className="h-7 w-7 text-primary" />
                     <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">LinkUP</span>
                   </Link>
@@ -117,7 +112,7 @@ export default function DashboardLayout({
               <SidebarFooter className="p-3">
                 <div className="flex items-center space-x-3 group-data-[collapsible=icon]:justify-center">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="person avatar"/>
                     <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="group-data-[collapsible=icon]:hidden">

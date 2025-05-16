@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { CardPreview } from '@/components/CardPreview';
 import { appTemplates } from '@/lib/types';
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
-import { sanitizeForUrl } from '@/lib/utils';
+import { sanitizeForUrl, ensureHttps } from '@/lib/utils'; // ensureHttps moved to utils
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PublicCardPage() {
@@ -31,8 +31,7 @@ export default function PublicCardPage() {
         setProfile(foundTemplate.profile);
         setDesign({
           ...foundTemplate.design,
-          // The QR code URL for the public card page should link to itself
-          qrCodeUrl: `${typeof window !== "undefined" ? window.location.href : ''}`, 
+          qrCodeUrl: typeof window !== "undefined" ? window.location.href : '', 
         });
       } else {
         setError('Card not found. The link may be incorrect or the card may have been removed.');
@@ -67,7 +66,7 @@ export default function PublicCardPage() {
     if (profile.twitter) vcfContent += `X-SOCIALPROFILE;TYPE=twitter:${ensureHttps(profile.twitter.startsWith('@') ? `https://twitter.com/${profile.twitter.substring(1)}` : profile.twitter)}\n`;
     if (profile.github) vcfContent += `X-SOCIALPROFILE;TYPE=github:${ensureHttps(profile.github.includes('/') ? profile.github : `https://github.com/${profile.github}`)}\n`;
     
-    if (profile.profilePictureUrl && !profile.profilePictureUrl.startsWith('data:')) { // Only link if it's a URL, not data URI
+    if (profile.profilePictureUrl && !profile.profilePictureUrl.startsWith('data:') && !profile.profilePictureUrl.startsWith('https://placehold.co')) {
          vcfContent += `PHOTO;VALUE=URL:${profile.profilePictureUrl}\n`;
      }
 
@@ -86,17 +85,6 @@ export default function PublicCardPage() {
     URL.revokeObjectURL(link.href);
   };
 
-  const ensureHttps = (url: string): string => {
-    if (!url) return "";
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      if (url.includes('.') && !url.includes(' ')) { 
-        return `https://${url}`;
-      }
-    }
-    return url;
-  };
-
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 bg-background">
@@ -110,13 +98,12 @@ export default function PublicCardPage() {
       <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <h1 className="text-2xl font-semibold text-destructive mb-4">Error</h1>
         <p className="text-lg text-muted-foreground">{error}</p>
-        <a href="/" className="mt-6 text-primary hover:underline">Go to Homepage</a>
+        <a href="/editor" className="mt-6 text-primary hover:underline">Go to Homepage</a> {/* Updated href to /editor */}
       </div>
     );
   }
 
   if (profile && design) {
-    // This div takes full screen and centers the CardPreview
     return (
       <div className="w-full h-screen flex items-center justify-center bg-background">
         <CardPreview 
@@ -132,7 +119,7 @@ export default function PublicCardPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <p className="text-lg text-muted-foreground">Could not load card data.</p>
-         <a href="/" className="mt-6 text-primary hover:underline">Go to Homepage</a>
+         <a href="/editor" className="mt-6 text-primary hover:underline">Go to Homepage</a> {/* Updated href to /editor */}
     </div>
   );
 }
