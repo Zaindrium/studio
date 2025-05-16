@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from '@/components/ui/button';
@@ -28,13 +29,25 @@ export function ShareCard({ cardUrl }: ShareCardProps) {
 
   const shareViaEmail = () => {
     if (typeof window !== "undefined") {
+      toast({ 
+        title: 'Opening Email Client', 
+        description: 'Attempting to share your card URL via email.' 
+      });
       window.location.href = `mailto:?subject=Check out my digital business card&body=Hi,%0D%0A%0D%0AHere's my digital business card: ${encodeURIComponent(cardUrl)}`;
+    } else {
+      toast({ title: 'Error', description: 'Cannot open email client outside of a browser environment.', variant: 'destructive' });
     }
   };
   
   const shareViaSMS = () => {
      if (typeof window !== "undefined") {
+      toast({ 
+        title: 'Opening SMS App', 
+        description: 'Attempting to share your card URL via SMS.' 
+      });
       window.location.href = `sms:?body=Check out my digital business card: ${encodeURIComponent(cardUrl)}`;
+    } else {
+      toast({ title: 'Error', description: 'Cannot open SMS app outside of a browser environment.', variant: 'destructive' });
     }
   };
 
