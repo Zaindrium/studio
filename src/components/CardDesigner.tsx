@@ -161,7 +161,7 @@ export function CardDesigner({ design, onDesignChange }: CardDesignerProps) {
         </div>
 
         <div>
-          <Button onClick={handleNfcWrite} className="w-full bg-accent hover:bg-accent/90">
+          <Button onClick={handleNfcWrite} className="w-full">
             <Nfc className="mr-2 h-5 w-5" /> Write to NFC Tag
           </Button>
           <p className="text-xs text-muted-foreground mt-2 text-center">
