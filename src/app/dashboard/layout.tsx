@@ -70,7 +70,7 @@ export default function DashboardLayout({
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar className="border-r border-sidebar-border" collapsible="icon">
           <SidebarHeader className="p-4 flex items-center space-x-3">
-              <Link href="/editor" className="flex items-center">
+              <Link href="/dashboard" className="flex items-center no-underline hover:opacity-90"> {/* Changed href to /dashboard */}
                 <LinkIcon className="h-7 w-7 text-primary" />
                 <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">LinkUP</span>
               </Link>

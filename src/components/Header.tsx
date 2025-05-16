@@ -1,8 +1,10 @@
+
 "use client"; // Added to use useRouter
 
 import { Button } from '@/components/ui/button';
 import { Link as LinkIcon, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation'; // Import useRouter
+import Link from 'next/link'; // Import Link
 
 export function Header() {
   const router = useRouter(); // Initialize useRouter
@@ -21,7 +23,7 @@ export function Header() {
           {/* This div is intentionally left empty or could hold a placeholder if needed for balance */}
         </div>
 
-        <div className="flex flex-col items-center text-center">
+        <Link href="/editor" className="flex flex-col items-center text-center no-underline hover:opacity-90">
           <div className="flex items-center">
             <LinkIcon className="h-8 w-8 mr-3" />
             <h1 className="text-3xl font-bold">LinkUP</h1>
@@ -29,7 +31,7 @@ export function Header() {
           <p className="text-sm text-primary-foreground/80 mt-1">
             Modern Digital Cards, Effortless Networking.
           </p>
-        </div>
+        </Link>
 
         <Button
           variant="outline"
