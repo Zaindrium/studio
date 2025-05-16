@@ -26,7 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import type { AuthenticatedUser, UserStatus } from '@/lib/app-types'; // Re-using AuthenticatedUser for admins
+import type { AuthenticatedUser, UserStatus } from '@/lib/app-types'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,11 +44,9 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 
-// Mock data for administrators (subset of AuthenticatedUser with 'Admin' role)
 const MOCK_ADMINS_DATA: AuthenticatedUser[] = [
   { id: 'admin1', name: 'Alice Admin', email: 'alice.admin@example.com', role: 'Admin', status: 'Active', teamId: undefined, lastLoginAt: '2024-07-30 10:00 AM', cardsCreatedCount: 0, createdAt: '2023-01-10' },
   { id: 'admin2', name: 'Robert ManagerAdmin', email: 'bob.admin@example.com', role: 'Admin', status: 'Active', teamId: undefined, lastLoginAt: '2024-07-29 09:30 AM', cardsCreatedCount: 0, createdAt: '2023-02-15' },
@@ -58,7 +56,7 @@ const MOCK_ADMINS_DATA: AuthenticatedUser[] = [
 const initialNewAdminState: Partial<AuthenticatedUser> = {
     name: '',
     email: '',
-    role: 'Admin', // Role is fixed for this page
+    role: 'Admin', 
     status: 'Invited',
 };
 
@@ -70,6 +68,9 @@ export default function AdministratorsPage() {
   const [isInviteAdminDialogOpen, setIsInviteAdminDialogOpen] = useState(false);
   const [newAdminForm, setNewAdminForm] = useState<Partial<AuthenticatedUser>>(initialNewAdminState);
   const [editingAdmin, setEditingAdmin] = useState<AuthenticatedUser | null>(null);
+  const [isDeleteAdminAlertOpen, setIsDeleteAdminAlertOpen] = useState(false);
+  const [adminToDelete, setAdminToDelete] = useState<AuthenticatedUser | null>(null);
+
 
   const filteredAdmins = useMemo(() => {
     return administrators.filter(admin =>
@@ -84,7 +85,7 @@ export default function AdministratorsPage() {
       setNewAdminForm({
         name: adminToEdit.name,
         email: adminToEdit.email,
-        role: 'Admin', // Role is fixed
+        role: 'Admin', 
         status: adminToEdit.status, 
       });
     } else {
@@ -137,13 +138,20 @@ export default function AdministratorsPage() {
     setIsInviteAdminDialogOpen(false);
   };
   
-  const handleDeleteAdmin = (adminId: string) => {
-    const adminToDelete = administrators.find(admin => admin.id === adminId);
-    setAdministrators(administrators.filter(admin => admin.id !== adminId));
+  const confirmDeleteAdmin = (admin: AuthenticatedUser) => {
+    setAdminToDelete(admin);
+    setIsDeleteAdminAlertOpen(true);
+  };
+
+  const handleDeleteAdmin = () => {
+    if (!adminToDelete) return;
+    setAdministrators(administrators.filter(admin => admin.id !== adminToDelete.id));
     toast({
         title: "Administrator Deleted",
-        description: `Administrator "${adminToDelete?.name}" has been removed. (Simulation)`,
+        description: `Administrator "${adminToDelete.name}" has been removed. (Simulation)`,
     });
+    setIsDeleteAdminAlertOpen(false);
+    setAdminToDelete(null);
   };
 
   const handleToggleAdminStatus = (adminId: string) => {
@@ -224,7 +232,7 @@ export default function AdministratorsPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreVertical className="h-4 w-4" />
-                           <span className="sr-only">Admin Actions</span>
+                           <span className="sr-only">Admin Actions for {admin.name}</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -244,32 +252,16 @@ export default function AdministratorsPage() {
                           {admin.status === 'Active' ? 'Deactivate' : 'Activate'}
                         </DropdownMenuItem>
                          <DropdownMenuSeparator />
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                    onSelect={(e) => e.preventDefault()} // Prevents DropdownMenu from closing
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Administrator
-                                </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the administrator account for "{admin.name}".
-                                    They will lose all administrative privileges.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteAdmin(admin.id)}>
-                                    Yes, delete administrator
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                confirmDeleteAdmin(admin);
+                            }}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Administrator
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -291,7 +283,6 @@ export default function AdministratorsPage() {
         </CardFooter>
       )}
 
-      {/* Invite/Edit Admin Dialog */}
       <Dialog open={isInviteAdminDialogOpen} onOpenChange={setIsInviteAdminDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -321,11 +312,10 @@ export default function AdministratorsPage() {
                   onChange={(e) => handleFormChange('email', e.target.value)}
                   placeholder="e.g., alex.admin@example.com"
                   required
-                  disabled={!!editingAdmin} // Email usually not editable once set
+                  disabled={!!editingAdmin} 
                 />
                  {editingAdmin && <p className="text-xs text-muted-foreground">Email address cannot be changed after creation.</p>}
               </div>
-              {/* Role is fixed to 'Admin' for this form */}
             </div>
             <DialogFooter>
               <DialogClose asChild>
@@ -336,8 +326,24 @@ export default function AdministratorsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteAdminAlertOpen} onOpenChange={setIsDeleteAdminAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the administrator account for "{adminToDelete?.name}".
+                They will lose all administrative privileges.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setAdminToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAdmin}>
+                Yes, delete administrator
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
-
-    

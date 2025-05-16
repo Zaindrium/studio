@@ -2,6 +2,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link'; // Import Link
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CreditCard, FileText, Repeat, ShieldCheck, Users, CalendarClock } from 'lucide-react';
@@ -17,8 +18,8 @@ const currentLicense = {
   cardLimit: 200,
   cardsUsed: 78,
   renewsOn: "August 30, 2024",
-  pricePerMonth: 115, // Changed from 49
-  currencySymbol: "R", // Added currency symbol
+  pricePerMonth: 115, 
+  currencySymbol: "R", 
 };
 
 export default function LicensePage() {
@@ -96,8 +97,10 @@ export default function LicensePage() {
 
             </CardContent>
             <CardFooter className="border-t pt-4">
-               <Button variant="outline" className="w-full md:w-auto">
-                <Repeat className="mr-2 h-4 w-4" /> Change Plan or View Options
+               <Button asChild variant="outline" className="w-full md:w-auto">
+                <Link href="/subscription"> {/* Updated Link */}
+                  <Repeat className="mr-2 h-4 w-4" /> Change Plan or View Options
+                </Link>
               </Button>
             </CardFooter>
           </Card>

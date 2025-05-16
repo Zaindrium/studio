@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -40,7 +41,7 @@ const sidebarNavItems = [
   { href: '/dashboard/generator', label: 'Generator', icon: Blocks },
   { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  // { href: '/dashboard/files', label: 'Files', icon: FolderArchive }, // Removed Files
+  // { href: '/dashboard/files', label: 'Files', icon: FolderArchive }, // Files section removed
   { href: '/dashboard/administrators', label: 'Administrators', icon: Building },
   { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle },
@@ -48,9 +49,6 @@ const sidebarNavItems = [
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
 ];
-
-// Metadata cannot be exported from a Client Component.
-// It should be defined in a Server Component, typically a page.tsx or a parent server layout.tsx.
 
 export default function DashboardLayout({
   children,
@@ -60,9 +58,16 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const user = MOCK_USER;
 
+  // Concept for handling premium features (would require global state)
+  // const currentPlan = "free"; // This would come from global state/context
+  // const isPremiumFeature = (href: string) => {
+  //   const premiumRoutes = ['/dashboard/generator', '/dashboard/integrations', '/dashboard/physical-cards'];
+  //   return premiumRoutes.includes(href);
+  // };
+
   return (
     <SidebarProvider defaultOpen>
-      <div className="flex min-h-screen bg-background text-foreground"> {/* Apply bg and text colors here */}
+      <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar className="border-r border-sidebar-border" collapsible="icon">
           <SidebarHeader className="p-4 flex items-center space-x-3">
               <Link href="/editor" className="flex items-center">
@@ -72,19 +77,28 @@ export default function DashboardLayout({
           </SidebarHeader>
           <SidebarContent className="p-2">
             <SidebarMenu>
-              {sidebarNavItems.map((item) => (
+              {sidebarNavItems.map((item) => {
+                // const isDisabled = currentPlan === 'free' && isPremiumFeature(item.href);
+                return (
                   <SidebarMenuItem key={item.href}>
                     <Link href={item.href} legacyBehavior passHref>
                       <SidebarMenuButton
-                        tooltip={{children: item.label, side: "right", align: "center"}}
+                        tooltip={{
+                          children: item.label, //  + (isDisabled ? ' (Premium)' : ''),
+                          side: "right", 
+                          align: "center"
+                        }}
                         isActive={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))}
+                        // disabled={isDisabled} // This would disable the button
+                        // className={isDisabled ? 'opacity-50 cursor-not-allowed' : ''} // This would grey it out
                       >
                         <item.icon className="h-5 w-5" />
                         <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                       </SidebarMenuButton>
                     </Link>
                   </SidebarMenuItem>
-              ))}
+                );
+              })}
             </SidebarMenu>
           </SidebarContent>
           <SidebarSeparator />

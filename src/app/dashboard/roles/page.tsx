@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea"; // Added for role description
+import { Textarea } from "@/components/ui/textarea"; 
 import {
   Table,
   TableBody,
@@ -43,7 +44,6 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 interface RolePermission {
@@ -56,7 +56,7 @@ interface Role {
   id: string;
   name: string;
   description: string;
-  permissions: RolePermission[]; // Simplified representation of permissions
+  permissions: RolePermission[]; 
 }
 
 const MOCK_PERMISSIONS_DATA: RolePermission[] = [
@@ -73,7 +73,7 @@ const MOCK_ROLES_DATA: Role[] = [
     id: 'role_admin', 
     name: 'Administrator', 
     description: 'Full access to all organization features and settings.', 
-    permissions: MOCK_PERMISSIONS_DATA // All permissions for admin
+    permissions: MOCK_PERMISSIONS_DATA 
   },
   { 
     id: 'role_manager', 
@@ -103,6 +103,8 @@ export default function RolesPage() {
   const [isModifyRoleDialogOpen, setIsModifyRoleDialogOpen] = useState(false);
   const [newRoleForm, setNewRoleForm] = useState<Partial<Role>>(initialNewRoleState);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [isDeleteRoleAlertOpen, setIsDeleteRoleAlertOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
 
   const filteredRoles = useMemo(() => {
     return roles.filter(role =>
@@ -117,7 +119,7 @@ export default function RolesPage() {
       setNewRoleForm({
         name: roleToEdit.name,
         description: roleToEdit.description,
-        permissions: roleToEdit.permissions, // For future permission assignment UI
+        permissions: roleToEdit.permissions, 
       });
     } else {
       setEditingRole(null);
@@ -165,13 +167,20 @@ export default function RolesPage() {
     setIsModifyRoleDialogOpen(false);
   };
   
-  const handleDeleteRole = (roleId: string) => {
-    const roleToDelete = roles.find(role => role.id === roleId);
-    setRoles(roles.filter(role => role.id !== roleId));
+  const confirmDeleteRole = (role: Role) => {
+    setRoleToDelete(role);
+    setIsDeleteRoleAlertOpen(true);
+  };
+
+  const handleDeleteRole = () => {
+    if (!roleToDelete) return;
+    setRoles(roles.filter(role => role.id !== roleToDelete.id));
     toast({
         title: "Role Deleted",
-        description: `Role "${roleToDelete?.name}" has been removed. (Simulation)`,
+        description: `Role "${roleToDelete.name}" has been removed. (Simulation)`,
     });
+    setIsDeleteRoleAlertOpen(false);
+    setRoleToDelete(null);
   };
 
   return (
@@ -214,7 +223,7 @@ export default function RolesPage() {
                   <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{role.description}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {role.permissions.slice(0, 3).map(perm => ( // Show first 3 permissions for brevity
+                      {role.permissions.slice(0, 3).map(perm => ( 
                         <Badge key={perm.id} variant="secondary" className="text-xs">{perm.name.replace(/_/g, ' ')}</Badge>
                       ))}
                       {role.permissions.length > 3 && <Badge variant="outline" className="text-xs">+{role.permissions.length - 3} more</Badge>}
@@ -234,37 +243,21 @@ export default function RolesPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Role Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem disabled> {/* Placeholder for future detailed permission management */}
+                        <DropdownMenuItem disabled> 
                             <Settings2 className="mr-2 h-4 w-4" />
                             Manage Permissions
                         </DropdownMenuItem>
                          <DropdownMenuSeparator />
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                    onSelect={(e) => e.preventDefault()} 
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Role
-                                </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the role "{role.name}".
-                                    Users assigned this role might lose specific access.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteRole(role.id)}>
-                                    Yes, delete role
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                confirmDeleteRole(role);
+                            }}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Role
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -286,7 +279,6 @@ export default function RolesPage() {
         </CardFooter>
       )}
 
-      {/* Add/Edit Role Dialog */}
       <Dialog open={isModifyRoleDialogOpen} onOpenChange={setIsModifyRoleDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -318,7 +310,6 @@ export default function RolesPage() {
                   rows={3}
                 />
               </div>
-              {/* Placeholder for more detailed permission assignment UI */}
               {editingRole && (
                 <div className="space-y-2 pt-2 border-t mt-2">
                     <Label>Assigned Permissions (Preview)</Label>
@@ -340,6 +331,24 @@ export default function RolesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteRoleAlertOpen} onOpenChange={setIsDeleteRoleAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the role "{roleToDelete?.name}".
+                Users assigned this role might lose specific access.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRoleToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteRole}>
+                Yes, delete role
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -42,6 +42,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 const MOCK_USERS_DATA: AuthenticatedUser[] = [
@@ -52,18 +62,17 @@ const MOCK_USERS_DATA: AuthenticatedUser[] = [
   { id: 'user5', name: 'Tom Wilson', email: 'tom.wilson@example.com', role: 'Employee', status: 'Inactive', teamId: 'team1', lastLoginAt: '2024-06-01 03:00 PM', cardsCreatedCount: 1, createdAt: '2023-03-10' },
 ];
 
-// Simplified team list for selection, assuming these IDs match teams in teams page mock data
 const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team1', name: 'Sales Team Alpha' },
   { id: 'team2', name: 'Marketing Crew Gamma' },
   { id: 'team3', name: 'Engineering Squad Beta' },
 ];
 
-const initialNewUserState: Partial<AuthenticatedUser> & { teamId: string } = { // Ensure teamId is string
+const initialNewUserState: Partial<AuthenticatedUser> & { teamId: string } = {
     name: '',
     email: '',
     role: 'Employee',
-    teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team', // Default to first team or 'no-team'
+    teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team',
 };
 
 
@@ -75,6 +84,8 @@ export default function UsersPage() {
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [newUserForm, setNewUserForm] = useState<Partial<AuthenticatedUser> & { teamId: string }>(initialNewUserState);
   const [editingUser, setEditingUser] = useState<AuthenticatedUser | null>(null);
+  const [isDeleteUserAlertOpen, setIsDeleteUserAlertOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<AuthenticatedUser | null>(null);
 
 
   const filteredUsers = useMemo(() => {
@@ -91,7 +102,7 @@ export default function UsersPage() {
         name: userToEdit.name,
         email: userToEdit.email,
         role: userToEdit.role,
-        teamId: userToEdit.teamId || 'no-team', // If teamId is undefined or '', set to 'no-team'
+        teamId: userToEdit.teamId || 'no-team', 
       });
     } else {
       setEditingUser(null);
@@ -118,14 +129,12 @@ export default function UsersPage() {
     const userTeamIdToSave = newUserForm.teamId === 'no-team' ? undefined : newUserForm.teamId;
 
     if (editingUser) {
-      // Update existing user
       setUsers(users.map(u => u.id === editingUser.id ? { ...editingUser, ...newUserForm, teamId: userTeamIdToSave, updatedAt: new Date().toISOString().split('T')[0] } as AuthenticatedUser : u));
       toast({
         title: "User Updated!",
         description: `User "${newUserForm.name}" has been successfully updated.`,
       });
     } else {
-      // Add new user
       const newUser: AuthenticatedUser = {
         id: `user-${Date.now()}`,
         name: newUserForm.name || '',
@@ -147,15 +156,20 @@ export default function UsersPage() {
     setIsAddUserDialogOpen(false);
   };
   
-  const handleDeleteUser = (userId: string) => {
-    const userToDelete = users.find(u => u.id === userId);
-    // In a real app, add an AlertDialog confirmation here
-    setUsers(users.filter(user => user.id !== userId));
+  const confirmDeleteUser = (user: AuthenticatedUser) => {
+    setUserToDelete(user);
+    setIsDeleteUserAlertOpen(true);
+  };
+  
+  const handleDeleteUser = () => {
+    if (!userToDelete) return;
+    setUsers(users.filter(user => user.id !== userToDelete.id));
     toast({
         title: "User Deleted",
-        description: `User "${userToDelete?.name}" has been removed. (Simulation)`,
-        variant: "default" 
+        description: `User "${userToDelete.name}" has been removed. (Simulation)`,
     });
+    setIsDeleteUserAlertOpen(false);
+    setUserToDelete(null);
   };
 
   const getTeamNameById = (teamId?: string) => {
@@ -223,7 +237,7 @@ export default function UsersPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreVertical className="h-4 w-4" />
-                           <span className="sr-only">User Actions</span>
+                           <span className="sr-only">User Actions for {user.name}</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -239,7 +253,8 @@ export default function UsersPage() {
                          <DropdownMenuSeparator />
                         <DropdownMenuItem 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => handleDeleteUser(user.id)}
+                            onClick={() => confirmDeleteUser(user)}
+                            onSelect={(e) => e.preventDefault()} // Prevents DropdownMenu from closing before Alert
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete User
@@ -262,11 +277,9 @@ export default function UsersPage() {
       {filteredUsers.length > 5 && (
         <CardFooter className="justify-center border-t pt-4">
           <p className="text-xs text-muted-foreground">Showing {filteredUsers.length} of {users.length} users.</p>
-          {/* TODO: Add pagination controls if list gets very long */}
         </CardFooter>
       )}
 
-      {/* Add/Edit User Dialog */}
       <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -317,8 +330,8 @@ export default function UsersPage() {
               <div className="space-y-2">
                 <Label htmlFor="userTeam">Assign to Team</Label>
                 <Select
-                  value={newUserForm.teamId} // Directly use newUserForm.teamId which is now 'teamX' or 'no-team'
-                  onValueChange={(value) => handleFormChange('teamId', value)} // Value is 'teamX' or 'no-team'
+                  value={newUserForm.teamId || 'no-team'}
+                  onValueChange={(value) => handleFormChange('teamId', value)} 
                 >
                   <SelectTrigger id="userTeam">
                     <SelectValue placeholder="Select a team" />
@@ -341,6 +354,23 @@ export default function UsersPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteUserAlertOpen} onOpenChange={setIsDeleteUserAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the user account for "{userToDelete?.name}".
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser}>
+                Yes, delete user
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

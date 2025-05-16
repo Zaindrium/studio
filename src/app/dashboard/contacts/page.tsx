@@ -37,6 +37,17 @@ import { Contact as ContactIcon, Search, MoreVertical, Trash2, Eye, PlusCircle, 
 import type { ContactInfo } from '@/lib/app-types';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const CONTACTS_STORAGE_KEY = 'linkup_collected_contacts';
 
@@ -52,6 +63,10 @@ export default function ContactsPage() {
   const [manualContactCompany, setManualContactCompany] = useState('');
   const [manualContactMessage, setManualContactMessage] = useState('');
   const [isSubmittingManualContact, setIsSubmittingManualContact] = useState(false);
+
+  const [isDeleteContactAlertOpen, setIsDeleteContactAlertOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<ContactInfo | null>(null);
+
 
   useEffect(() => {
     try {
@@ -79,17 +94,20 @@ export default function ContactsPage() {
     );
   }, [contacts, searchTerm]);
 
-  const handleDeleteContact = (contactId: string) => {
-    if (!window.confirm("Are you sure you want to delete this contact? This action cannot be undone.")) {
-        return;
-    }
+  const confirmDeleteContact = (contact: ContactInfo) => {
+    setContactToDelete(contact);
+    setIsDeleteContactAlertOpen(true);
+  };
+
+  const handleDeleteContact = () => {
+    if(!contactToDelete) return;
     try {
-      const updatedContacts = contacts.filter(c => c.id !== contactId);
+      const updatedContacts = contacts.filter(c => c.id !== contactToDelete.id);
       localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(updatedContacts));
       setContacts(updatedContacts);
       toast({
         title: "Contact Deleted",
-        description: "The contact has been removed from your list.",
+        description: `Contact "${contactToDelete.name}" has been removed.`,
       });
     } catch (error) {
       console.error("Error deleting contact from localStorage:", error);
@@ -98,6 +116,9 @@ export default function ContactsPage() {
         description: "Could not remove the contact. Please try again.",
         variant: "destructive",
       });
+    } finally {
+        setIsDeleteContactAlertOpen(false);
+        setContactToDelete(null);
     }
   };
   
@@ -137,12 +158,12 @@ export default function ContactsPage() {
       phone: manualContactPhone || undefined,
       company: manualContactCompany || undefined,
       message: manualContactMessage || undefined,
-      submittedFromCardId: 'manual_entry', // Indicate it was a manual entry
+      submittedFromCardId: 'manual_entry', 
       submittedAt: new Date().toISOString(),
     };
 
     try {
-      const updatedContacts = [newContact, ...contacts]; // Add to beginning for recent first
+      const updatedContacts = [newContact, ...contacts]; 
       updatedContacts.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
       localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(updatedContacts));
       setContacts(updatedContacts);
@@ -213,12 +234,12 @@ export default function ContactsPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreVertical className="h-4 w-4" />
-                           <span className="sr-only">Contact Actions</span>
+                           <span className="sr-only">Contact Actions for {contact.name}</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem disabled> {/* Placeholder for future "View Full Details" modal */}
+                        <DropdownMenuItem disabled> 
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
@@ -231,7 +252,10 @@ export default function ContactsPage() {
                          <DropdownMenuSeparator />
                         <DropdownMenuItem 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => handleDeleteContact(contact.id)}
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                confirmDeleteContact(contact);
+                            }}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete Contact
@@ -254,11 +278,9 @@ export default function ContactsPage() {
       {filteredContacts.length > 10 && ( 
         <CardFooter className="justify-center border-t pt-4">
           <p className="text-xs text-muted-foreground">Showing {filteredContacts.length} of {contacts.length} contacts.</p>
-          {/* TODO: Add pagination if list becomes very long */}
         </CardFooter>
       )}
 
-      {/* Manual Add Contact Dialog */}
       <Dialog open={isAddManualContactDialogOpen} onOpenChange={setIsAddManualContactDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -301,6 +323,21 @@ export default function ContactsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteContactAlertOpen} onOpenChange={setIsDeleteContactAlertOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the contact "{contactToDelete?.name}".
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setContactToDelete(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteContact}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </Card>
   );
 }

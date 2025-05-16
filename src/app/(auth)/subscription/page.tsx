@@ -51,11 +51,12 @@ export default function SubscriptionPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(plans[1].id); // Default to Business Starter
   const [isLoading, setIsLoading] = useState(false);
 
-  // This page would be shown after business signup if subscription is required.
-  // It assumes the account type is 'business'.
+  // This page could be shown after business signup or when changing plans.
+  // It might need context about whether it's an initial signup or an upgrade/downgrade.
 
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
+    // In a real app, you might store this selection in a global state or pass it to the next step.
   };
 
   const handleProceedToPayment = async () => {
@@ -66,17 +67,19 @@ export default function SubscriptionPage() {
     await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
     // On success, redirect to dashboard or next step.
     setIsLoading(false);
+    // In a real app, you would likely redirect to the dashboard or a payment confirmation page.
+    // For now, this button is a placeholder.
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-8">
+    <div className="w-full max-w-5xl mx-auto py-8 px-4">
       <header className="text-center mb-10">
         <h1 className="text-4xl font-bold text-primary mb-2">Choose Your Plan</h1>
-        <p className="text-lg text-muted-foreground">Select the perfect plan for your business needs.</p>
+        <p className="text-lg text-muted-foreground">Select the perfect plan for your personal or business needs.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {plans.filter(plan => plan.isBusiness).map((plan) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {plans.map((plan) => (
           <Card 
             key={plan.id} 
             className={cn(
@@ -106,6 +109,10 @@ export default function SubscriptionPage() {
                   </li>
                 ))}
               </ul>
+               <p className="text-xs text-muted-foreground mt-2">
+                {plan.isBusiness ? <Users className="inline h-3 w-3 mr-1"/> : null }
+                {plan.userLimit === Infinity ? 'Unlimited Users' : `Up to ${plan.userLimit} User${plan.userLimit > 1 ? 's' : ''}`}
+              </p>
             </CardContent>
             <CardFooter>
               <Button 
@@ -129,7 +136,7 @@ export default function SubscriptionPage() {
           className="min-w-[200px]"
         >
           <CreditCard className="mr-2 h-5 w-5" />
-          {isLoading ? 'Processing...' : 'Proceed to Payment'}
+          {isLoading ? 'Processing...' : (selectedPlanId === 'free' ? 'Start with Free Plan' : 'Proceed to Payment')}
         </Button>
          <p className="text-xs text-muted-foreground mt-2">
           Secure payment processing. You can change your plan later.
