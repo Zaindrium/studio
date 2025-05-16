@@ -1,11 +1,10 @@
-
-"use client"; 
+"use client";
 
 import React from 'react';
 // Fonts are handled by the root layout
 import '../globals.css';
 // Toaster is handled by the root layout
-import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, FolderArchive, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart } from 'lucide-react';
+import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart } from 'lucide-react';
 import {
   Sidebar,
   SidebarProvider,
@@ -45,7 +44,7 @@ const sidebarNavItems = [
   { href: '/dashboard/administrators', label: 'Administrators', icon: Building },
   { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle },
-  { href: '/dashboard/license', label: 'License Management', icon: CreditCard }, 
+  { href: '/dashboard/license', label: 'License Management', icon: CreditCard },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
 ];

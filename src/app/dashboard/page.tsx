@@ -1,15 +1,12 @@
-
 "use client";
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Eye, QrCode, Share2, Users, CreditCard, BarChart3 } from 'lucide-react'; // Removed Percent as it's not directly used for an icon here
-import { Button } from "@/components/ui/button"; // Added missing Button import
-import Link from 'next/link'; // Added missing Link import
-// Assuming a chart component exists, e.g., from shadcn/ui/chart
-// import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Eye, QrCode, Share2, Users, CreditCard, BarChart3 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import Link from 'next/link';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
-import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts'; // Aliased BarChart to avoid conflict if any
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 
 
 // Placeholder data for charts - in a real app, this would come from an API / state management
@@ -121,7 +118,7 @@ export default function DashboardPage() {
             </ChartContainer>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center"><CreditCard className="mr-2 h-5 w-5 text-primary" />Card & Plan Overview</CardTitle>
@@ -143,8 +140,8 @@ export default function DashboardPage() {
               </div>
                {/* Basic progress bar simulation */}
               <div className="w-full bg-muted rounded-full h-2.5">
-                <div 
-                    className="bg-primary h-2.5 rounded-full" 
+                <div
+                    className="bg-primary h-2.5 rounded-full"
                     style={{ width: `${analytics.planUsagePercent}%` }}
                 ></div>
               </div>
@@ -172,4 +169,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
