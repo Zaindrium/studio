@@ -156,6 +156,17 @@ export interface AppTemplate {
   design: CardDesignSettings;
 }
 
+export interface ContactInfo {
+  id: string; // Unique ID for the contact
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  message?: string;
+  submittedFromCardId?: string; // Which card's URL they submitted from
+  submittedAt: string; // ISO date string
+}
+
 const defaultClassicProfile: UserProfile = {
   name: 'Jane Doe',
   title: 'Software Engineer',
@@ -168,7 +179,7 @@ const defaultClassicProfile: UserProfile = {
   github: 'github.com/janedoe',
   address: '123 Main St, Anytown, USA',
   profilePictureUrl: `https://placehold.co/100x100.png`,
-  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
+  cardBackgroundUrl: `https://placehold.co/600x900.png` , 
   userInfo: 'A software engineer passionate about web development and open source.',
   targetAudience: 'Tech recruiters, potential clients, and collaborators in the software industry.',
 };
@@ -195,7 +206,7 @@ const creativeProfessionalProfile: UserProfile = {
   twitter: '@alexcreative',
   github: '',
   address: '789 Art Block, Design District',
-  profilePictureUrl: `https://placehold.co/120x120.png`, 
+  profilePictureUrl: `https://placehold.co/120x120.png` , 
   cardBackgroundUrl: `https://placehold.co/600x900.png`, 
   userInfo: 'Visual storyteller specializing in portrait photography and branding design. Loves vibrant colors and bold statements.',
   targetAudience: 'Art directors, gallery owners, individuals seeking creative visual services.',
