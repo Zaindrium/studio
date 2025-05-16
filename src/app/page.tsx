@@ -15,11 +15,8 @@ import { QuickShareFAB } from '@/components/QuickShareFAB'; // Added
 import type { UserProfile, CardDesignSettings, AppTemplate } from '@/lib/types';
 import { appTemplates } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { sanitizeForUrl } from '@/lib/utils';
 
-
-const sanitizeForUrl = (name: string) => {
-  return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'my-card';
-}
 
 const initialTemplate = appTemplates[0]; 
 const ONBOARDING_STORAGE_KEY = 'linkup_onboarding_completed';

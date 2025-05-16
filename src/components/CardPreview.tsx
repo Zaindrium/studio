@@ -3,9 +3,9 @@
 
 import React from 'react';
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
-import NextImage from 'next/image'; // Renamed to avoid conflict with Lucide's Image
+import NextImage from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, QrCode as QrCodeIcon, UserCircle2 } from 'lucide-react';
+import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, UserCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CardPreviewProps {
@@ -36,6 +36,10 @@ function CardPreviewComponent({ profile, design }: CardPreviewProps) {
   const iconSize = "h-5 w-5";
   const profileIconSize = "h-16 w-16";
 
+  const qrCodeImageUrl = design.qrCodeUrl 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(design.qrCodeUrl)}`
+    : `https://placehold.co/128x128.png`; // Fallback if qrCodeUrl is empty
+
   return (
     <Card className="shadow-xl sticky top-6">
       <CardHeader>
@@ -65,7 +69,7 @@ function CardPreviewComponent({ profile, design }: CardPreviewProps) {
                 className="rounded-full object-cover border-2"
                 style={{ borderColor: design.colorScheme.primaryColor }}
                 data-ai-hint="person portrait"
-                onError={(e) => (e.currentTarget.src = `https://placehold.co/100x100.png`)} // Fallback placeholder
+                onError={(e) => (e.currentTarget.src = `https://placehold.co/100x100.png`)}
               />
             ) : (
               <div 
@@ -140,7 +144,13 @@ function CardPreviewComponent({ profile, design }: CardPreviewProps) {
         <div className="mt-6 p-4 border rounded-lg bg-secondary/50 w-full max-w-md flex flex-col items-center">
             <h3 className="text-lg font-semibold mb-2" style={{color: design.colorScheme.primaryColor}}>Your QR Code</h3>
             <div className="p-2 bg-white rounded-md inline-block shadow">
-                 <QrCodeIcon className="h-32 w-32 text-foreground" />
+                 <NextImage
+                    src={qrCodeImageUrl}
+                    alt={`QR Code for ${profile.name || 'card'}`}
+                    width={128}
+                    height={128}
+                    data-ai-hint="qr code"
+                  />
             </div>
             <p className="text-xs text-muted-foreground mt-2 text-center break-all">Links to: {design.qrCodeUrl}</p>
         </div>
