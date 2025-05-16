@@ -59,11 +59,11 @@ const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team3', name: 'Engineering Squad Beta' },
 ];
 
-const initialNewUserState: Partial<AuthenticatedUser> = {
+const initialNewUserState: Partial<AuthenticatedUser> & { teamId: string } = { // Ensure teamId is string
     name: '',
     email: '',
     role: 'Employee',
-    teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || '',
+    teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team', // Default to first team or 'no-team'
 };
 
 
@@ -73,7 +73,7 @@ export default function UsersPage() {
   const { toast } = useToast();
 
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  const [newUserForm, setNewUserForm] = useState<Partial<AuthenticatedUser>>(initialNewUserState);
+  const [newUserForm, setNewUserForm] = useState<Partial<AuthenticatedUser> & { teamId: string }>(initialNewUserState);
   const [editingUser, setEditingUser] = useState<AuthenticatedUser | null>(null);
 
 
@@ -91,7 +91,7 @@ export default function UsersPage() {
         name: userToEdit.name,
         email: userToEdit.email,
         role: userToEdit.role,
-        teamId: userToEdit.teamId,
+        teamId: userToEdit.teamId || 'no-team', // If teamId is undefined or '', set to 'no-team'
       });
     } else {
       setEditingUser(null);
@@ -100,7 +100,7 @@ export default function UsersPage() {
     setIsAddUserDialogOpen(true);
   };
   
-  const handleFormChange = (field: keyof Partial<AuthenticatedUser>, value: string | UserRole | UserStatus) => {
+  const handleFormChange = (field: keyof (Partial<AuthenticatedUser> & { teamId: string }), value: string | UserRole | UserStatus) => {
     setNewUserForm(prev => ({ ...prev, [field]: value }));
   };
 
@@ -115,9 +115,11 @@ export default function UsersPage() {
       return;
     }
 
+    const userTeamIdToSave = newUserForm.teamId === 'no-team' ? undefined : newUserForm.teamId;
+
     if (editingUser) {
       // Update existing user
-      setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...newUserForm, updatedAt: new Date().toISOString().split('T')[0] } as AuthenticatedUser : u));
+      setUsers(users.map(u => u.id === editingUser.id ? { ...editingUser, ...newUserForm, teamId: userTeamIdToSave, updatedAt: new Date().toISOString().split('T')[0] } as AuthenticatedUser : u));
       toast({
         title: "User Updated!",
         description: `User "${newUserForm.name}" has been successfully updated.`,
@@ -126,13 +128,15 @@ export default function UsersPage() {
       // Add new user
       const newUser: AuthenticatedUser = {
         id: `user-${Date.now()}`,
-        ...initialNewUserState, // apply defaults first
-        ...newUserForm, // then apply form data
-        status: 'Invited', // New users start as 'Invited'
-        createdAt: new Date().toISOString().split('T')[0], // Basic date string
+        name: newUserForm.name || '',
+        email: newUserForm.email || '',
+        role: newUserForm.role || 'Employee',
+        teamId: userTeamIdToSave, 
+        status: 'Invited', 
+        createdAt: new Date().toISOString().split('T')[0], 
         cardsCreatedCount: 0,
         lastLoginAt: '-',
-      } as AuthenticatedUser;
+      };
 
       setUsers(prevUsers => [newUser, ...prevUsers]);
       toast({
@@ -155,13 +159,13 @@ export default function UsersPage() {
   };
 
   const getTeamNameById = (teamId?: string) => {
-    if (!teamId) return 'N/A';
+    if (!teamId || teamId === 'no-team') return 'N/A';
     return MOCK_TEAMS_FOR_SELECT.find(t => t.id === teamId)?.name || 'Unknown Team';
   };
   
   const getStatusVariant = (status: UserStatus): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
-      case 'Active': return 'default'; // primary color
+      case 'Active': return 'default'; 
       case 'Invited': return 'secondary';
       case 'Inactive': return 'outline';
       default: return 'secondary';
@@ -313,8 +317,8 @@ export default function UsersPage() {
               <div className="space-y-2">
                 <Label htmlFor="userTeam">Assign to Team</Label>
                 <Select
-                  value={newUserForm.teamId}
-                  onValueChange={(value) => handleFormChange('teamId', value)}
+                  value={newUserForm.teamId} // Directly use newUserForm.teamId which is now 'teamX' or 'no-team'
+                  onValueChange={(value) => handleFormChange('teamId', value)} // Value is 'teamX' or 'no-team'
                 >
                   <SelectTrigger id="userTeam">
                     <SelectValue placeholder="Select a team" />
@@ -323,7 +327,7 @@ export default function UsersPage() {
                     {MOCK_TEAMS_FOR_SELECT.map(team => (
                         <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
                     ))}
-                     <SelectItem value="">No Team (Assign Later)</SelectItem>
+                     <SelectItem value="no-team">No Team (Assign Later)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
