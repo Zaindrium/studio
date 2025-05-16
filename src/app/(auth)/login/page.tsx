@@ -2,14 +2,18 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from 'next/link';
 import { Mail, Key, LogIn } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 export default function LoginPage() {
+  const router = useRouter(); // Initialize useRouter
+  const { toast } = useToast(); // Initialize useToast
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -17,12 +21,38 @@ export default function LoginPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
+    toast({
+      title: "Attempting Login...",
+      description: "Please wait while we verify your credentials.",
+    });
+
     // Placeholder for actual login logic
     console.log("Login attempt with:", { email, password });
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    // On success, redirect to dashboard, on error, show toast.
-    // For now, just log and reset loading.
-    setIsLoading(false);
+
+    // SIMULATED SUCCESS & REDIRECTION LOGIC
+    // In a real app, you'd get user data and account type from the backend.
+    // For this simulation, we'll infer account type from email.
+    const isBusinessAccount = email.toLowerCase().includes('business.com') || email.toLowerCase().includes('corp.com'); // Example heuristic
+
+    if (isBusinessAccount) {
+      toast({
+        title: "Login Successful!",
+        description: "Redirecting to your Business Dashboard...",
+        variant: "default",
+      });
+      router.push('/dashboard');
+    } else {
+      toast({
+        title: "Login Successful!",
+        description: "Redirecting to the Card Editor...",
+        variant: "default",
+      });
+      router.push('/editor');
+    }
+    // In a real error scenario:
+    // toast({ title: "Login Failed", description: "Invalid email or password.", variant: "destructive" });
+    // setIsLoading(false);
   };
 
   return (
@@ -39,24 +69,24 @@ export default function LoginPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary"/>Email</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="you@example.com" 
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com or admin@business.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required 
+              required
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Password</Label>
-            <Input 
-              id="password" 
-              type="password" 
-              placeholder="••••••••" 
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required 
+              required
             />
           </div>
         </CardContent>

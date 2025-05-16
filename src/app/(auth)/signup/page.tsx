@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,10 +10,13 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from 'next/link';
 import { UserPlus, Mail, Key, Building, UserCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 type AccountType = "personal" | "business";
 
 export default function SignupPage() {
+  const router = useRouter(); // Initialize useRouter
+  const { toast } = useToast(); // Initialize useToast
   const [accountType, setAccountType] = useState<AccountType>("personal");
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,17 +28,47 @@ export default function SignupPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
+    toast({
+      title: "Creating Account...",
+      description: "Please wait while we set up your account.",
+    });
+
     if (password !== confirmPassword) {
-      // Handle password mismatch - typically with a toast
-      console.error("Passwords do not match");
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match. Please re-enter.",
+        variant: "destructive",
+      });
       setIsLoading(false);
       return;
     }
+
     // Placeholder for actual signup logic
     console.log("Signup attempt with:", { accountType, email, password, companyName, adminName });
     await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-    // On success, redirect to login or verification step, on error, show toast.
-    setIsLoading(false);
+
+    // SIMULATED SUCCESS & REDIRECTION LOGIC
+    // In a real app, this would involve creating a user in the DB,
+    // sending a verification email, etc.
+    if (accountType === "personal") {
+      toast({
+        title: "Account Created!",
+        description: "Welcome! Redirecting to the Card Editor...",
+        variant: "default",
+      });
+      router.push('/editor');
+    } else { // business account
+      toast({
+        title: "Business Account Created!",
+        description: "Welcome! Redirecting to your Business Dashboard...",
+        // In a real app, you might redirect to /subscription or a verification step.
+        variant: "default",
+      });
+      router.push('/dashboard');
+    }
+    // In a real error scenario:
+    // toast({ title: "Signup Failed", description: "Could not create account. Please try again.", variant: "destructive" });
+    // setIsLoading(false);
   };
 
   return (
@@ -71,10 +105,10 @@ export default function SignupPage() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="companyName" className="flex items-center"><Building className="mr-2 h-4 w-4 text-primary"/>Company Name</Label>
-                <Input 
-                  id="companyName" 
-                  type="text" 
-                  placeholder="Your Company Inc." 
+                <Input
+                  id="companyName"
+                  type="text"
+                  placeholder="Your Company Inc."
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   required={accountType === 'business'}
@@ -82,10 +116,10 @@ export default function SignupPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adminName" className="flex items-center"><UserCircle className="mr-2 h-4 w-4 text-primary"/>Your Name (Admin)</Label>
-                <Input 
-                  id="adminName" 
-                  type="text" 
-                  placeholder="Admin Full Name" 
+                <Input
+                  id="adminName"
+                  type="text"
+                  placeholder="Admin Full Name"
                   value={adminName}
                   onChange={(e) => setAdminName(e.target.value)}
                   required={accountType === 'business'}
@@ -96,35 +130,35 @@ export default function SignupPage() {
 
           <div className="space-y-2">
             <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary"/>Email</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              placeholder="you@example.com" 
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required 
+              required
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Password</Label>
-            <Input 
-              id="password" 
-              type="password" 
-              placeholder="••••••••" 
+            <Input
+              id="password"
+              type="password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required 
+              required
             />
           </div>
            <div className="space-y-2">
             <Label htmlFor="confirmPassword" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Confirm Password</Label>
-            <Input 
-              id="confirmPassword" 
-              type="password" 
-              placeholder="••••••••" 
+            <Input
+              id="confirmPassword"
+              type="password"
+              placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required 
+              required
             />
           </div>
         </CardContent>
