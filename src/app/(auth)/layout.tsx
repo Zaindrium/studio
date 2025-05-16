@@ -1,19 +1,7 @@
 
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import '../globals.css'; // Use the global styles from the main app
-import { Toaster } from "@/components/ui/toaster";
 import { Link as LinkIcon } from 'lucide-react';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'LinkUP Authentication',
@@ -26,22 +14,16 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-      <head />
-      <body className="bg-background text-foreground">
-        <div className="min-h-screen flex flex-col items-center justify-center p-4">
-          <header className="absolute top-0 left-0 right-0 py-6">
-            <div className="container mx-auto flex items-center justify-center sm:justify-start">
-              <LinkIcon className="h-8 w-8 mr-3 text-primary" />
-              <h1 className="text-3xl font-bold text-primary">LinkUP</h1>
-            </div>
-          </header>
-          <main className="w-full max-w-md">
-            {children}
-          </main>
+    <div className="bg-background text-foreground min-h-screen flex flex-col items-center justify-center p-4">
+      <header className="absolute top-0 left-0 right-0 py-6">
+        <div className="container mx-auto flex items-center justify-center sm:justify-start">
+          <LinkIcon className="h-8 w-8 mr-3 text-primary" />
+          <h1 className="text-3xl font-bold text-primary">LinkUP</h1>
         </div>
-        <Toaster />
-      </body>
-    </html>
+      </header>
+      <main className="w-full max-w-md">
+        {children}
+      </main>
+    </div>
   );
 }
