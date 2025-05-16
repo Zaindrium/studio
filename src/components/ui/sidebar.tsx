@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -533,13 +534,18 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
+// Extend the TooltipContent props to include our custom flag
+type ExtendedTooltipContentProps = React.ComponentProps<typeof TooltipContent> & {
+  isLockedFeatureTooltip?: boolean;
+};
+
 const SidebarMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & {
     asChild?: boolean
     isActive?: boolean
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>
-  } & VariantProps<typeof sidebarMenuButtonVariants>
+    tooltip?: string | ExtendedTooltipContentProps
+  } & VariantProps<typeof sidebarMenuButtonVariants> // Corrected this line
 >(
   (
     {
@@ -571,11 +577,20 @@ const SidebarMenuButton = React.forwardRef<
       return button
     }
 
+    let tooltipProps: ExtendedTooltipContentProps;
     if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
+      tooltipProps = { children: tooltip };
+    } else {
+      tooltipProps = tooltip;
     }
+    
+    let finalHidden = state !== "collapsed" || isMobile; // Default logic
+
+    // For desktop, if it's a locked feature tooltip, always show it (don't hide).
+    if (!isMobile && tooltipProps.isLockedFeatureTooltip) {
+      finalHidden = false;
+    }
+
 
     return (
       <Tooltip>
@@ -583,8 +598,8 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
+          hidden={finalHidden}
+          {...tooltipProps} // Pass all props including our custom one and children
         />
       </Tooltip>
     )

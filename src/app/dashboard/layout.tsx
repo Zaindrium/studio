@@ -37,12 +37,12 @@ const sidebarNavItems = [
   { href: '/dashboard/users', label: 'Users', icon: UserCog },
   { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard },
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
-  { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true }, 
-  { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true }, 
+  { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true },
+  { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
   { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true },
-  { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true }, 
-  { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true }, 
+  { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true },
+  { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true },
   { href: '/dashboard/license', label: 'License Management', icon: CreditCard },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
@@ -92,15 +92,16 @@ export default function DashboardLayout({
                       <SidebarMenuButton
                         tooltip={{
                           children: tooltipText,
-                          side: "right", 
-                          align: "center"
+                          side: "right",
+                          align: "center",
+                          isLockedFeatureTooltip: isPremiumLocked // Pass this flag
                         }}
                         isActive={!isPremiumLocked && (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)))}
                         disabled={isPremiumLocked}
                         className={isPremiumLocked ? 'opacity-60 cursor-not-allowed hover:bg-transparent hover:text-sidebar-foreground' : ''}
                         onClick={isPremiumLocked ? (e) => {
-                            e.preventDefault(); 
-                            router.push('/dashboard/license'); 
+                            e.preventDefault();
+                            router.push('/dashboard/license');
                         } : undefined}
                       >
                         <item.icon className="h-5 w-5" />
