@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -8,8 +9,9 @@ import { CardPreview } from '@/components/CardPreview';
 import { CardDesigner } from '@/components/CardDesigner';
 import { AiDesignAssistant } from '@/components/AiDesignAssistant';
 import { ShareCard } from '@/components/ShareCard';
-import type { UserProfile, CardDesignSettings } from '@/lib/types';
-import { defaultUserProfile, defaultCardDesignSettings } from '@/lib/types';
+import { TemplatePicker } from '@/components/TemplatePicker';
+import type { UserProfile, CardDesignSettings, AppTemplate } from '@/lib/types';
+import { appTemplates } from '@/lib/types'; // Import appTemplates
 import { Skeleton } from '@/components/ui/skeleton';
 
 
@@ -17,9 +19,12 @@ const sanitizeForUrl = (name: string) => {
   return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'my-card';
 }
 
+const initialTemplate = appTemplates[0]; // Use the first template as the default
+
 export default function HomePage() {
-  const [userProfile, setUserProfile] = useState<UserProfile>(defaultUserProfile);
-  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(defaultCardDesignSettings);
+  const [userProfile, setUserProfile] = useState<UserProfile>(initialTemplate.profile);
+  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplate.id);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -51,7 +56,6 @@ export default function HomePage() {
         ...prev.colorScheme,
         ...(suggestedDesign.colorScheme || {}),
       };
-      // Ensure all color scheme properties exist, falling back to current if AI didn't provide one
       const finalColorScheme = {
         cardBackground: newColorScheme.cardBackground || prev.colorScheme.cardBackground,
         textColor: newColorScheme.textColor || prev.colorScheme.textColor,
@@ -70,11 +74,21 @@ export default function HomePage() {
     setUserProfile(prev => ({...prev, ...aiData}));
   }, []);
 
+  const handleTemplateSelect = useCallback((templateId: string) => {
+    const selected = appTemplates.find(t => t.id === templateId);
+    if (selected) {
+      setUserProfile(selected.profile);
+      setCardDesign(selected.design); // QR code URL will be updated by the useEffect for userProfile.name
+      setSelectedTemplateId(templateId);
+    }
+  }, []);
+
   if (!isClient) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Header />
         <main className="flex-grow container mx-auto px-4 py-8">
+          <Skeleton className="h-[180px] w-full rounded-lg mb-8" /> 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 space-y-8">
               <Skeleton className="h-[600px] w-full rounded-lg" />
@@ -96,6 +110,11 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       <Header />
       <main className="flex-grow container mx-auto px-4 py-8">
+        <TemplatePicker 
+          templates={appTemplates} 
+          currentTemplateId={selectedTemplateId} 
+          onTemplateSelect={handleTemplateSelect} 
+        />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">
             <UserProfileForm profile={userProfile} onProfileChange={handleProfileChange} />
