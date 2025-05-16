@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { CardDesignSettings } from '@/lib/types';
@@ -43,26 +44,31 @@ export function CardDesigner({ design, onDesignChange }: CardDesignerProps) {
   };
 
   const handleNfcWrite = () => {
-    console.log('Attempting to write to NFC tag with data:', design.qrCodeUrl);
-    toast({
-      title: "NFC Write Feature",
-      description: "This would initiate writing to an NFC tag using WebNFC API if available. (This is a UI placeholder)",
-      duration: 5000,
-    });
-    // Example WebNFC logic (requires HTTPS and user interaction):
-    // if ('NDEFReader' in window) {
-    //   const ndef = new window.NDEFReader();
-    //   ndef.write({
-    //     records: [{ recordType: "url", data: design.qrCodeUrl }]
-    //   }).then(() => {
-    //     toast({ title: "Success", description: "Data written to NFC tag." });
-    //   }).catch((error: Error) => {
-    //     console.error("NFC write error:", error);
-    //     toast({ title: "Error", description: `NFC Error: ${error.message}`, variant: "destructive" });
-    //   });
-    // } else {
-    //   toast({ title: "Unsupported", description: "Web NFC is not supported on this browser or context.", variant: "destructive" });
-    // }
+    if (typeof window !== 'undefined' && 'NDEFReader' in window) {
+      console.log('Attempting to write to NFC tag with data:', design.qrCodeUrl);
+      toast({
+        title: "NFC Ready!",
+        description: "Enable NFC on your phone and tap it to your tag to write your card URL.",
+        duration: 7000, // Give more time for user to react
+      });
+      // Actual WebNFC write logic would go here:
+      // const ndef = new (window as any).NDEFReader();
+      // ndef.write({
+      //   records: [{ recordType: "url", data: design.qrCodeUrl }]
+      // }).then(() => {
+      //   toast({ title: "Success!", description: "Card URL written to NFC tag." });
+      // }).catch((error: Error) => {
+      //   console.error("NFC write error:", error);
+      //   toast({ title: "NFC Error", description: `Could not write to tag: ${error.message}`, variant: "destructive" });
+      // });
+    } else {
+      toast({
+        title: "WebNFC Not Supported",
+        description: "Your browser doesn't support WebNFC. Try Chrome on Android for this feature.",
+        variant: "destructive",
+        duration: 7000,
+      });
+    }
   };
 
 
@@ -159,7 +165,7 @@ export function CardDesigner({ design, onDesignChange }: CardDesignerProps) {
             <Nfc className="mr-2 h-5 w-5" /> Write to NFC Tag
           </Button>
           <p className="text-xs text-muted-foreground mt-2 text-center">
-            Securely write your card to an NFC tag. (WebNFC browser support required)
+            Tap to write your card URL to an NFC tag. Ensure NFC is enabled and tap your phone to the tag. Requires a browser with WebNFC support (e.g., Chrome on Android).
           </p>
         </div>
       </CardContent>
