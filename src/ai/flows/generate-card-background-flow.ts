@@ -63,9 +63,7 @@ The image should be vertically oriented (portrait).`;
           { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         ],
       },
-       output: {
-        format: 'json', // Though we primarily want the image, some text output might occur.
-      },
+      // Removed: output: { format: 'json' }, as it's not supported/needed for image generation with gemini-2.0-flash-exp
     });
 
     if (!media || !media.url) {
