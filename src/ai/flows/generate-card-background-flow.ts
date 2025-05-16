@@ -56,21 +56,20 @@ The image should be vertically oriented (portrait).`;
       prompt: promptText,
       config: {
         responseModalities: ['TEXT', 'IMAGE'], // Must include IMAGE for generation
-         safetySettings: [ // Relax safety settings slightly for more creative outputs if needed, be mindful
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        ],
+        // Removed safetySettings as a troubleshooting step for "JSON mode is not enabled" error.
+        // safetySettings: [ 
+        //   { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        //   { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        //   { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        //   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        // ],
       },
-      // Removed: output: { format: 'json' }, as it's not supported/needed for image generation with gemini-2.0-flash-exp
     });
 
     if (!media || !media.url) {
       throw new Error('AI failed to generate an image or image data was not found.');
     }
     
-    // Gemini 2.0 Flash Exp should return a data URI directly in media.url
     if (!media.url.startsWith('data:image')) {
         throw new Error(`Generated media URL is not a valid data URI: ${media.url}`);
     }
