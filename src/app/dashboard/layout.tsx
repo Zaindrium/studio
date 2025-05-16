@@ -41,7 +41,7 @@ const sidebarNavItems = [
   { href: '/dashboard/generator', label: 'Generator', icon: Blocks },
   { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  { href: '/dashboard/files', label: 'Files', icon: FolderArchive },
+  // { href: '/dashboard/files', label: 'Files', icon: FolderArchive }, // Removed Files
   { href: '/dashboard/administrators', label: 'Administrators', icon: Building },
   { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle },
