@@ -76,7 +76,6 @@ export default function HomePage() {
     setCardDesign(currentDesign => {
         const potentialNextDesign = { ...currentDesign, ...newDesignData };
         
-        // Simple shallow comparison for top-level properties
         let hasActuallyChanged = false;
         const topLevelKeys = ['template', 'layout', 'qrCodeUrl'] as const;
         for (const key of topLevelKeys) {
@@ -86,7 +85,6 @@ export default function HomePage() {
             }
         }
 
-        // Compare colorScheme separately
         if (!hasActuallyChanged && potentialNextDesign.colorScheme) {
             const currentColorScheme = currentDesign.colorScheme || {};
             const nextColorScheme = potentialNextDesign.colorScheme;
@@ -109,7 +107,7 @@ export default function HomePage() {
   const handleAiApplySuggestions = useCallback((suggestedDesign: Partial<CardDesignSettings>) => {
     setCardDesign(prev => {
       const newColorSchemePartial = suggestedDesign.colorScheme || {};
-      const currentColorScheme = prev.colorScheme || { cardBackground: '', textColor: '', primaryColor: '' }; // Ensure currentColorScheme is defined
+      const currentColorScheme = prev.colorScheme || { cardBackground: '', textColor: '', primaryColor: '' };
 
       const finalColorScheme = {
         cardBackground: newColorSchemePartial.cardBackground || currentColorScheme.cardBackground,
@@ -125,18 +123,24 @@ export default function HomePage() {
     });
   }, []);
 
-  const handleUpdateProfileForAI = useCallback((aiData: {userInfo?: string, targetAudience?: string}) => {
-    setUserProfile(prev => ({...prev, ...aiData}));
-  }, []);
+  const handleUpdateProfileForAI = useCallback((aiData: Partial<UserProfile>) => { // Modified to accept Partial<UserProfile>
+    // This function is used by AiDesignAssistant to update parts of the UserProfile,
+    // like 'userInfo' or 'cardBackgroundUrl' from AI suggestions/generations.
+    // It directly calls handleProfileChange to ensure consistent update logic.
+    handleProfileChange(aiData);
+  }, [handleProfileChange]);
+
 
   const handleTemplateSelect = useCallback((templateId: string) => {
     const selected = appTemplates.find(t => t.id === templateId);
     if (selected) {
-      setUserProfile(selected.profile); // This will trigger the more robust handleProfileChange logic internally if used via form
-      setCardDesign(selected.design); 
+      // Use handleProfileChange to ensure consistent update logic & prevent loops
+      handleProfileChange(selected.profile);
+      // Use handleDesignChange for similar reasons
+      handleDesignChange(selected.design);
       setSelectedTemplateId(templateId);
     }
-  }, []);
+  }, [handleProfileChange, handleDesignChange]);
 
   const handleOnboardingClose = useCallback(() => { 
     setShowOnboarding(false);
@@ -195,7 +199,7 @@ export default function HomePage() {
             <ShareCard cardUrl={cardDesign.qrCodeUrl} />
           </div>
         </div>
-        {isClient && <QuickShareFAB cardUrl={cardDesign.qrCodeUrl} />} {/* Added */}
+        {isClient && <QuickShareFAB cardUrl={cardDesign.qrCodeUrl} />}
       </main>
       <Footer />
     </div>

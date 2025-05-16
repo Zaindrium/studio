@@ -4,10 +4,11 @@
 import React, { useState } from 'react';
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
 import { proposeCardEnhancements, ProposeCardEnhancementsInput, ProposeCardEnhancementsOutput } from '@/ai/flows/propose-card-enhancements';
+import { generateCardBackground, GenerateCardBackgroundInput, GenerateCardBackgroundOutput } from '@/ai/flows/generate-card-background-flow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Wand2, Lightbulb, Info } from 'lucide-react';
+import { Sparkles, Wand2, Lightbulb, Info, ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -15,12 +16,13 @@ interface AiDesignAssistantProps {
   userProfile: UserProfile;
   currentDesign: CardDesignSettings;
   onApplySuggestions: (updatedDesign: Partial<CardDesignSettings>) => void;
-  onUpdateProfileForAI: (aiRelatedProfileData: Partial<Pick<UserProfile, 'userInfo'>>) => void;
+  onUpdateProfileForAI: (aiRelatedProfileData: Partial<UserProfile>) => void; // Modified to accept Partial<UserProfile>
 }
 
 export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestions, onUpdateProfileForAI }: AiDesignAssistantProps) {
   const [suggestions, setSuggestions] = useState<ProposeCardEnhancementsOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isGeneratingBackground, setIsGeneratingBackground] = useState(false);
   const { toast } = useToast();
 
   const handleSuggestEnhancements = async () => {
@@ -32,10 +34,9 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
       });
       return;
     }
-    setIsLoading(true);
+    setIsLoadingSuggestions(true);
     setSuggestions(null);
     try {
-      // Map UserProfile to ProposeCardEnhancementsInput
       const input: ProposeCardEnhancementsInput = {
         name: userProfile.name,
         title: userProfile.title,
@@ -62,7 +63,6 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
       console.error("AI enhancement error:", error);
       let message = "Could not fetch AI suggestions. Please try again.";
       if (error instanceof Error) {
-        // Check if the error is from Zod parsing (e.g. unexpected format from LLM)
         if (error.name === 'ZodError') {
             message = "AI response was not in the expected format. Please try again.";
         } else {
@@ -75,19 +75,17 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingSuggestions(false);
     }
   };
 
   const handleApplyEnhancements = () => {
     if (!suggestions) return;
 
-    // Apply About Me suggestion
     if (suggestions.suggestedAboutMe) {
       onUpdateProfileForAI({ userInfo: suggestions.suggestedAboutMe });
     }
 
-    // Apply layout and color scheme
     const designUpdate: Partial<CardDesignSettings> = {};
     if (suggestions.suggestedLayout) {
       designUpdate.layout = suggestions.suggestedLayout;
@@ -106,16 +104,43 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
 
     toast({
       title: "Enhancements Applied!",
-      description: "The card design and profile have been updated with AI recommendations.",
+      description: "Card design and 'About Me' updated with AI recommendations.",
     });
   };
+
+  const handleGenerateBackground = async () => {
+    if (!suggestions || !suggestions.suggestedKeywordsForBackground || suggestions.suggestedKeywordsForBackground.length === 0) {
+      toast({ title: "No Keywords", description: "AI needs keywords to generate a background.", variant: "destructive" });
+      return;
+    }
+    setIsGeneratingBackground(true);
+    try {
+      const input: GenerateCardBackgroundInput = { 
+        keywords: suggestions.suggestedKeywordsForBackground,
+        existingColors: currentDesign.colorScheme 
+      };
+      const result = await generateCardBackground(input);
+      if (result.imageDataUri) {
+        onUpdateProfileForAI({ cardBackgroundUrl: result.imageDataUri });
+        toast({ title: "AI Background Generated!", description: "New background image applied to your card." });
+      } else {
+        throw new Error("AI did not return image data.");
+      }
+    } catch (error) {
+      console.error("AI background generation error:", error);
+      toast({ title: "Background Generation Error", description: `Could not generate background: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+    } finally {
+      setIsGeneratingBackground(false);
+    }
+  };
+
 
   return (
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center text-2xl"><Sparkles className="mr-2 h-6 w-6 text-primary" />AI Card Enhancer</CardTitle>
         <CardDescription>
-          Get AI-powered suggestions for your card's content, layout, and colors based on your profile.
+          Get AI-powered suggestions for your card's content, layout, colors, and even generate a background image!
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -123,13 +148,13 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
           <Lightbulb className="h-4 w-4" />
           <AlertTitle>How it works</AlertTitle>
           <AlertDescription>
-            The AI uses your entire profile to generate holistic suggestions. Ensure your profile details are up-to-date for the best results!
+            The AI uses your entire profile (including links for context if possible) to generate holistic suggestions. Ensure your profile details are up-to-date! LinkedIn profile pictures cannot be fetched automatically; please upload yours manually.
           </AlertDescription>
         </Alert>
 
-        <Button onClick={handleSuggestEnhancements} disabled={isLoading} className="w-full">
+        <Button onClick={handleSuggestEnhancements} disabled={isLoadingSuggestions || isGeneratingBackground} className="w-full">
           <Wand2 className="mr-2 h-5 w-5" />
-          {isLoading ? 'Getting Suggestions...' : 'Suggest Enhancements'}
+          {isLoadingSuggestions ? 'Getting Suggestions...' : 'Suggest Enhancements'}
         </Button>
 
         {suggestions && (
@@ -164,13 +189,17 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
             </div>
             
             {suggestions.suggestedKeywordsForBackground && suggestions.suggestedKeywordsForBackground.length > 0 && (
-              <div>
+              <div className="space-y-2">
                 <Label className="font-medium">Background Image Keywords:</Label>
-                <div className="flex flex-wrap gap-2 mt-1">
+                <div className="flex flex-wrap gap-2">
                   {suggestions.suggestedKeywordsForBackground.map(keyword => (
                     <span key={keyword} className="text-xs p-2 bg-background rounded-full">{keyword}</span>
                   ))}
                 </div>
+                <Button onClick={handleGenerateBackground} disabled={isGeneratingBackground || isLoadingSuggestions} className="w-full" variant="outline">
+                  <ImageIcon className="mr-2 h-5 w-5" />
+                  {isGeneratingBackground ? 'Generating Background...' : 'Generate Background with AI'}
+                </Button>
               </div>
             )}
 
@@ -184,8 +213,19 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
                 </ul>
               </div>
             )}
+
+             {suggestions.scrapingNotes && suggestions.scrapingNotes.length > 0 && (
+              <div>
+                <Label className="font-medium flex items-center"><Info className="mr-1.5 h-4 w-4 text-amber-500"/>Web Scraping Notes:</Label>
+                <ul className="list-disc list-inside text-xs p-2 bg-background/50 border border-amber-500/30 rounded-md space-y-1 mt-1 text-muted-foreground">
+                  {suggestions.scrapingNotes.map((note, index) => (
+                    <li key={index}>{note}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             
-            <Button onClick={handleApplyEnhancements} variant="default" className="w-full mt-4">Apply Enhancements</Button>
+            <Button onClick={handleApplyEnhancements} variant="default" className="w-full mt-4" disabled={isGeneratingBackground || isLoadingSuggestions}>Apply Suggested Text & Design</Button>
           </div>
         )}
       </CardContent>
