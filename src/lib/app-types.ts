@@ -2,68 +2,93 @@
 // Renaming types.ts to app-types.ts to avoid conflict with native TS types
 // And to specifically denote application-level type definitions.
 
-// Existing UserProfile and CardDesignSettings might be reused or adapted
-// For now, these are new types for the business dashboard context.
+export interface UserProfile { // This is for the card editor, not directly for dashboard users
+  name: string;
+  title: string;
+  company: string;
+  phone: string;
+  email: string;
+  website: string;
+  linkedin: string;
+  twitter: string;
+  github: string;
+  address: string;
+  profilePictureUrl?: string;
+  cardBackgroundUrl?: string;
+  userInfo?: string; 
+  targetAudience?: string;
+}
+
+export interface CardDesignSettings {
+  template: 'classic' | 'modern' | 'minimalist';
+  layout: 'image-left' | 'image-right' | 'image-top';
+  colorScheme: {
+    cardBackground: string;
+    textColor: string;
+    primaryColor: string;
+  };
+  qrCodeUrl: string;
+}
 
 export interface OrganizationProfile {
   id: string;
   name: string;
   industry?: string;
-  size?: string; // e.g., "1-10 employees", "11-50 employees"
+  size?: string; 
   website?: string;
-  address?: string; // Could be a more structured address object
-  // ... other company details
-  subscriptionPlanId: string; // e.g., 'starter', 'growth', 'enterprise'
+  address?: string;
+  subscriptionPlanId: string;
   subscriptionStatus: 'active' | 'inactive' | 'trial';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // Using string for mock data simplicity, Date in real app
+  updatedAt: string; // Using string for mock data simplicity, Date in real app
 }
 
 export interface Team {
   id: string;
-  organizationId: string;
+  organizationId?: string; // Optional, for mock data simplicity
   name: string;
-  description?: string;
-  managerUserIds: string[]; // IDs of users who are managers of this team
-  memberUserIds: string[];
-  defaultTemplateId?: string; // Optional template assigned to this team
-  createdAt: Date;
-  updatedAt: Date;
+  description: string;
+  memberUserIds?: string[]; // Simplified for now
+  manager: string; // Simplified for mock data
+  memberCount: number; // For display on teams page
+  defaultTemplateId?: string; 
+  createdAt?: string; 
+  updatedAt?: string; 
 }
 
-// Extending existing UserProfile or creating a new one for authenticated users
-export interface AuthenticatedUser {
+export type UserRole = 'Admin' | 'Manager' | 'Employee';
+export type UserStatus = 'Active' | 'Invited' | 'Inactive';
+
+export interface AuthenticatedUser { // This type will be used for the dashboard user list
   id: string;
-  organizationId?: string; // Optional: Personal accounts might not have this
-  teamId?: string;         // Optional: Users might not be in a team
+  organizationId?: string; 
+  teamId?: string;        
   name: string;
   email: string;
-  emailVerified: boolean;
-  passwordHash: string; // NEVER store plain text passwords
-  role: 'admin' | 'manager' | 'employee' | 'personal_user';
-  profilePictureUrl?: string; // Reusing from existing UserProfile type
-  title?: string; // Reusing from existing UserProfile type
-  phone?: string; // Reusing from existing UserProfile type
-  accessCode?: string; // For employee first-time login
+  emailVerified?: boolean;
+  role: UserRole;
+  status: UserStatus;
+  profilePictureUrl?: string; 
+  title?: string; 
+  phone?: string; 
+  accessCode?: string; 
   accessCodeUsed?: boolean;
-  onboardingCompleted: boolean;
-  lastLoginAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  onboardingCompleted?: boolean;
+  lastLoginAt?: string; // Using string for mock data, Date in real app
+  cardsCreatedCount?: number; // Example metric
+  createdAt: string; 
+  updatedAt?: string;
 }
 
-// Reusing or adapting existing UserProfile for card data
-// This might need to be linked to an AuthenticatedUser
 export interface BusinessCardData {
   id: string;
-  userId: string; // The AuthenticatedUser who owns/created this card
-  organizationId?: string; // If it's an organizational card
-  teamId?: string; // If it's tied to a specific team
+  userId: string; 
+  organizationId?: string; 
+  teamId?: string; 
   
-  // Core profile info for the card (can be different from user's account info)
   name: string;
   title: string;
-  company?: string; // Could be pre-filled from OrganizationProfile for business users
+  company?: string; 
   phone?: string;
   email: string;
   website?: string;
@@ -73,59 +98,43 @@ export interface BusinessCardData {
   address?: string;
   profilePictureUrl?: string;
   cardBackgroundUrl?: string;
-  userInfo?: string; // About me
+  userInfo?: string; 
   
-  // Design settings - reusing existing CardDesignSettings
-  designSettings: CardDesignSettings; // Imported or redefined from existing types.ts
+  designSettings: CardDesignSettings; 
 
-  // Analytics (placeholders, actual tracking would be complex)
-  viewCount: number;
-  scanCount: number;
-  shareCount: number;
+  viewCount?: number;
+  scanCount?: number;
+  shareCount?: number;
 
-  isPublic: boolean;
-  publicUrlSlug: string; // e.g., "john-doe-techcorp"
+  isPublic?: boolean;
+  publicUrlSlug?: string;
 
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Reusing existing CardDesignSettings
-export interface CardDesignSettings {
-  template: 'classic' | 'modern' | 'minimalist'; // Example values
-  layout: 'image-left' | 'image-right' | 'image-top';
-  colorScheme: {
-    cardBackground: string;
-    textColor: string;
-    primaryColor: string;
-  };
-  // qrCodeUrl is specific to the old system, might be deprecated or dynamically generated
+  createdAt: string; 
+  updatedAt?: string; 
 }
 
 
 export interface CardTemplate {
   id: string;
-  organizationId: string; // Templates belong to an organization
+  organizationId?: string; 
   name: string;
   description?: string;
-  designSettings: CardDesignSettings; // Pre-defined design for the template
-  isDefault?: boolean; // Is it a default org template?
-  createdAt: Date;
-  updatedAt: Date;
+  designSettings: CardDesignSettings; 
+  isDefault?: boolean; 
+  createdAt: string; 
+  updatedAt?: string;
 }
 
-// AccessCode would likely be a simpler structure, perhaps directly on the User or a separate small table
 export interface AccessCode {
-    code: string; // The unique code itself
-    userId: string; // User this code is for
+    code: string; 
+    userId: string; 
     organizationId: string;
     isUsed: boolean;
-    expiresAt?: Date;
-    createdAt: Date;
+    expiresAt?: string;
+    createdAt: string;
 }
 
 
-// Placeholder for analytics data structure
 export interface DashboardAnalytics {
   totalCardViews: number;
   weeklyCardViews: number;
@@ -135,5 +144,126 @@ export interface DashboardAnalytics {
   weeklyShares: number;
   totalCards: number;
   totalUsers: number;
-  planUsagePercent: number; // e.g., 75 for 75%
+  planUsagePercent: number;
 }
+
+// Keep original AppTemplate for editor page if still used
+export interface AppTemplate {
+  id: string;
+  name: string;
+  description: string;
+  profile: UserProfile; // This UserProfile is for the card editor
+  design: CardDesignSettings;
+}
+
+const defaultClassicProfile: UserProfile = {
+  name: 'Jane Doe',
+  title: 'Software Engineer',
+  company: 'Tech Solutions Inc.',
+  phone: '+1234567890',
+  email: 'jane.doe@example.com',
+  website: 'https://example.com',
+  linkedin: 'linkedin.com/in/janedoe',
+  twitter: 'twitter.com/janedoe',
+  github: 'github.com/janedoe',
+  address: '123 Main St, Anytown, USA',
+  profilePictureUrl: `https://placehold.co/100x100.png`,
+  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
+  userInfo: 'A software engineer passionate about web development and open source.',
+  targetAudience: 'Tech recruiters, potential clients, and collaborators in the software industry.',
+};
+
+const defaultClassicDesign: CardDesignSettings = {
+  template: 'classic',
+  layout: 'image-left',
+  colorScheme: {
+    cardBackground: '#FFFFFF',
+    textColor: '#333333',
+    primaryColor: '#3F51B5', 
+  },
+  qrCodeUrl: '/card/classic-default',
+};
+
+const creativeProfessionalProfile: UserProfile = {
+  name: 'Alex Creative',
+  title: 'Photographer & Designer',
+  company: 'Pixel Perfect Studios',
+  phone: '+1-555-CREATIVE',
+  email: 'alex@pixelperfect.art',
+  website: 'https://pixelperfect.art',
+  linkedin: 'linkedin.com/in/alexcreative',
+  twitter: '@alexcreative',
+  github: '',
+  address: '789 Art Block, Design District',
+  profilePictureUrl: `https://placehold.co/120x120.png`, 
+  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
+  userInfo: 'Visual storyteller specializing in portrait photography and branding design. Loves vibrant colors and bold statements.',
+  targetAudience: 'Art directors, gallery owners, individuals seeking creative visual services.',
+};
+
+const creativeProfessionalDesign: CardDesignSettings = {
+  template: 'modern',
+  layout: 'image-top',
+  colorScheme: {
+    cardBackground: '#F8F8F8', 
+    textColor: '#2C3E50',    
+    primaryColor: '#E74C3C', 
+  },
+  qrCodeUrl: '/card/alex-creative',
+};
+
+const corporateExecutiveProfile: UserProfile = {
+  name: 'Dr. Evelyn Reed',
+  title: 'CEO & Strategic Consultant',
+  company: 'Global Strategy Partners',
+  phone: '+1-800-EXECUTIVE',
+  email: 'e.reed@globalstrategy.com',
+  website: 'https://globalstrategy.com',
+  linkedin: 'linkedin.com/in/evelynreedceo',
+  twitter: '',
+  github: '',
+  address: '1 Business Bay, Financial Center',
+  profilePictureUrl: `https://placehold.co/100x100.png`,
+  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
+  userInfo: 'Experienced CEO with a track record in business transformation and market growth. Focus on data-driven strategies.',
+  targetAudience: 'Investors, board members, C-suite executives, industry leaders.',
+};
+
+const corporateExecutiveDesign: CardDesignSettings = {
+  template: 'minimalist',
+  layout: 'image-right',
+  colorScheme: {
+    cardBackground: '#0A2342', 
+    textColor: '#EAEAEA',    
+    primaryColor: '#A9BCD0', 
+  },
+  qrCodeUrl: '/card/evelyn-reed',
+};
+
+export const appTemplates: AppTemplate[] = [
+  {
+    id: 'classic-default',
+    name: 'Classic Default',
+    description: 'A balanced and professional starting point.',
+    profile: defaultClassicProfile,
+    design: defaultClassicDesign,
+  },
+  {
+    id: 'creative-pro',
+    name: 'Creative Professional',
+    description: 'Bold and visual, perfect for artists and designers.',
+    profile: creativeProfessionalProfile,
+    design: creativeProfessionalDesign,
+  },
+  {
+    id: 'corporate-exec',
+    name: 'Corporate Executive',
+    description: 'Sleek and authoritative for business leaders.',
+    profile: corporateExecutiveProfile,
+    design: corporateExecutiveDesign,
+  },
+];
+
+
+export const defaultUserProfile: UserProfile = defaultClassicProfile;
+export const defaultCardDesignSettings: CardDesignSettings = defaultClassicDesign;
