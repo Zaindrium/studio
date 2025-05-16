@@ -1,5 +1,7 @@
+
 "use client";
 
+import React from 'react';
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
 import NextImage from 'next/image'; // Renamed to avoid conflict with Lucide's Image
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +25,7 @@ const ensureHttps = (url: string) => {
 };
 
 
-export function CardPreview({ profile, design }: CardPreviewProps) {
+function CardPreviewComponent({ profile, design }: CardPreviewProps) {
   const cardStyle = {
     backgroundColor: design.colorScheme.cardBackground,
     color: design.colorScheme.textColor,
@@ -116,13 +118,13 @@ export function CardPreview({ profile, design }: CardPreviewProps) {
               {profile.twitter && (
                 <div className="flex items-center gap-2">
                   <Twitter className={cn(iconSize)} style={textPrimaryColor} />
-                  <a href={ensureHttps(profile.twitter.startsWith('@') ? `twitter.com/${profile.twitter.substring(1)}` : profile.twitter)} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">{profile.twitter}</a>
+                  <a href={ensureHttps(profile.twitter.startsWith('@') ? `https://twitter.com/${profile.twitter.substring(1)}` : profile.twitter)} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">{profile.twitter}</a>
                 </div>
               )}
               {profile.github && (
                 <div className="flex items-center gap-2">
                   <Github className={cn(iconSize)} style={textPrimaryColor} />
-                  <a href={ensureHttps(profile.github.includes('/') ? profile.github : `github.com/${profile.github}`)} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">{profile.github}</a>
+                  <a href={ensureHttps(profile.github.includes('/') ? profile.github : `https://github.com/${profile.github}`)} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">{profile.github}</a>
                 </div>
               )}
               {profile.address && (
@@ -147,3 +149,5 @@ export function CardPreview({ profile, design }: CardPreviewProps) {
     </Card>
   );
 }
+
+export const CardPreview = React.memo(CardPreviewComponent);
