@@ -33,16 +33,16 @@ const MOCK_USER = {
 
 const sidebarNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/teams', label: 'Teams', icon: Users },
+  { href: '/dashboard/teams', label: 'Teams', icon: Users, isPremium: true },
   { href: '/dashboard/users', label: 'Users', icon: UserCog },
   { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard },
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
-  { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true }, // Mark as premium
-  { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true }, // Mark as premium
+  { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true }, 
+  { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true }, 
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  { href: '/dashboard/administrators', label: 'Administrators', icon: Building },
-  { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true }, // Mark as premium
-  { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true }, // Mark as premium
+  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true },
+  { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true }, 
+  { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true }, 
   { href: '/dashboard/license', label: 'License Management', icon: CreditCard },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
@@ -87,7 +87,7 @@ export default function DashboardLayout({
                 const effectiveLabel = item.label + (isPremiumLocked ? " (Premium)" : "");
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <Link href={isPremiumLocked ? "#" : item.href} legacyBehavior passHref>
+                    <Link href={isPremiumLocked ? "/dashboard/license" : item.href} legacyBehavior passHref>
                       <SidebarMenuButton
                         tooltip={{
                           children: effectiveLabel,
@@ -99,7 +99,7 @@ export default function DashboardLayout({
                         className={isPremiumLocked ? 'opacity-60 cursor-not-allowed hover:bg-transparent hover:text-sidebar-foreground' : ''}
                         onClick={isPremiumLocked ? (e) => {
                             e.preventDefault(); 
-                            router.push('/dashboard/license'); // Or '/subscription'
+                            router.push('/dashboard/license'); 
                         } : undefined}
                       >
                         <item.icon className="h-5 w-5" />
