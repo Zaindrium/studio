@@ -16,9 +16,10 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button'; // Added Button
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus } from 'lucide-react';
-import React from 'react';
+import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud } from 'lucide-react'; // Added UploadCloud
+import React, { useRef } from 'react'; // Added useRef
 
 const profileSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -31,8 +32,8 @@ const profileSchema = z.object({
   twitter: z.string().optional(),
   github: z.string().optional(),
   address: z.string().optional(),
-  profilePictureUrl: z.string().url({ message: 'Invalid URL for profile picture.' }).optional().or(z.literal('')),
-  cardBackgroundUrl: z.string().url({ message: 'Invalid URL for card background.' }).optional().or(z.literal('')),
+  profilePictureUrl: z.string().optional().or(z.literal('')), // Accepts URL or dataURI
+  cardBackgroundUrl: z.string().optional().or(z.literal('')), // Accepts URL or dataURI
   userInfo: z.string().optional().describe('Information about the user, including their profession and interests for AI assistant.'),
   targetAudience: z.string().optional().describe('The target audience for the business card for AI assistant.'),
 });
@@ -41,7 +42,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 interface UserProfileFormProps {
   profile: UserProfile;
-  onProfileChange: (data: UserProfile) => void;
+  onProfileChange: (data: Partial<UserProfile>) => void; // Changed to Partial<UserProfile>
 }
 
 export function UserProfileForm({ profile, onProfileChange }: UserProfileFormProps) {
@@ -50,24 +51,34 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
     defaultValues: profile,
   });
 
-  // Effect 1: Sync form with external profile changes.
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
+  const cardBackgroundInputRef = useRef<HTMLInputElement>(null);
+
   React.useEffect(() => {
     form.reset(profile);
   }, [profile, form]);
 
-  // Effect 2: Implement inline/live editing.
   React.useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      // Ensure 'onProfileChange' is called only with valid profile data.
-      if (name && profileSchema.shape.hasOwnProperty(name)) {
-        onProfileChange(value as UserProfile);
-      } else if (!name) { // A full form update (e.g., after 'reset').
-        onProfileChange(value as UserProfile);
-      }
+    const subscription = form.watch((value) => {
+      onProfileChange(value as UserProfile);
     });
-    return () => subscription.unsubscribe(); // Clean up the subscription on unmount
+    return () => subscription.unsubscribe();
   }, [form, onProfileChange]);
 
+  const handleFileChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    fieldName: keyof ProfileFormValues
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        form.setValue(fieldName, reader.result as string);
+        // onProfileChange({ [fieldName]: reader.result as string }); // This will be handled by the watch effect
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <Card className="shadow-lg">
@@ -209,30 +220,78 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
                 )}
               />
             </div>
+
             <FormField
               control={form.control}
               name="profilePictureUrl"
-              render={({ field }) => (
+              render={() => ( // field is not directly used here for the button case
                 <FormItem>
-                  <FormLabel className="flex items-center"><ImageIcon className="mr-2 h-4 w-4" />Profile Picture URL (Optional)</FormLabel>
+                  <FormLabel className="flex items-center"><ImageIcon className="mr-2 h-4 w-4" />Profile Picture</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. https://placehold.co/100x100.png" {...field} data-ai-hint="person portrait" />
+                    <>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        ref={profilePictureInputRef}
+                        onChange={(e) => handleFileChange(e, 'profilePictureUrl')}
+                        className="hidden"
+                        data-ai-hint="person portrait"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => profilePictureInputRef.current?.click()}
+                        className="w-full"
+                      >
+                        <UploadCloud className="mr-2 h-4 w-4" />
+                        Upload Profile Photo
+                      </Button>
+                    </>
                   </FormControl>
-                  <FormDescription>Use a direct link to an image. (e.g., https://placehold.co/100x100.png)</FormDescription>
+                  <FormDescription>
+                    {form.watch('profilePictureUrl') && typeof form.watch('profilePictureUrl') === 'string' && !form.watch('profilePictureUrl').startsWith('data:') ? 
+                    `Current URL: ${form.watch('profilePictureUrl')}` : 
+                    form.watch('profilePictureUrl') ? 'New photo selected.' : 'No photo selected.'}
+                     Ideal aspect ratio: 1:1.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
              <FormField
               control={form.control}
               name="cardBackgroundUrl"
-              render={({ field }) => (
+              render={() => ( // field is not directly used here
                 <FormItem>
-                  <FormLabel className="flex items-center"><ImagePlus className="mr-2 h-4 w-4" />Card Background Image URL (Optional)</FormLabel>
+                  <FormLabel className="flex items-center"><ImagePlus className="mr-2 h-4 w-4" />Card Background Image</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. https://placehold.co/600x400.png" {...field} data-ai-hint="abstract background" />
+                     <>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        ref={cardBackgroundInputRef}
+                        onChange={(e) => handleFileChange(e, 'cardBackgroundUrl')}
+                        className="hidden"
+                        data-ai-hint="abstract background"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => cardBackgroundInputRef.current?.click()}
+                        className="w-full"
+                      >
+                         <UploadCloud className="mr-2 h-4 w-4" />
+                        Upload Background Image
+                      </Button>
+                    </>
                   </FormControl>
-                  <FormDescription>Use a direct link to an image for the card background. (e.g., https://placehold.co/600x400.png)</FormDescription>
+                  <FormDescription>
+                    {form.watch('cardBackgroundUrl') && typeof form.watch('cardBackgroundUrl') === 'string' && !form.watch('cardBackgroundUrl').startsWith('data:') ?
+                     `Current URL: ${form.watch('cardBackgroundUrl')}` : 
+                     form.watch('cardBackgroundUrl') ? 'New background selected.' : 'No background selected.'} 
+                     Ideal aspect ratio: 9:16 (portrait).
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -273,5 +332,3 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
     </Card>
   );
 }
-
-    
