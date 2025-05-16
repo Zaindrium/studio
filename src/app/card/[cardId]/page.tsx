@@ -8,7 +8,6 @@ import { appTemplates } from '@/lib/types';
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
 import { sanitizeForUrl } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-// Button is now used within CardPreview for "Save Contact"
 
 export default function PublicCardPage() {
   const params = useParams();
@@ -32,7 +31,8 @@ export default function PublicCardPage() {
         setProfile(foundTemplate.profile);
         setDesign({
           ...foundTemplate.design,
-          qrCodeUrl: `${typeof window !== "undefined" ? window.location.origin : ''}/card/${cardId}`, 
+          // The QR code URL for the public card page should link to itself
+          qrCodeUrl: `${typeof window !== "undefined" ? window.location.href : ''}`, 
         });
       } else {
         setError('Card not found. The link may be incorrect or the card may have been removed.');
@@ -47,12 +47,9 @@ export default function PublicCardPage() {
   const handleSaveContact = () => {
     if (!profile) return;
 
-    // Construct VCF data
-    // Using \\n for VCF line breaks as per standard for file content
     let vcfContent = 'BEGIN:VCARD\n';
     vcfContent += 'VERSION:3.0\n';
     
-    // Name processing: N:LastName;FirstName;MiddleName;Prefix;Suffix
     const nameParts = profile.name.trim().split(' ');
     const lastName = nameParts.length > 1 ? nameParts.pop() : '';
     const firstName = nameParts.join(' ');
@@ -64,25 +61,17 @@ export default function PublicCardPage() {
     if (profile.phone) vcfContent += `TEL;TYPE=WORK,VOICE:${profile.phone}\n`;
     if (profile.email) vcfContent += `EMAIL:${profile.email}\n`;
     if (profile.website) vcfContent += `URL:${ensureHttps(profile.website)}\n`;
-    if (profile.address) vcfContent += `ADR;TYPE=WORK:;;${profile.address};;;;\n`; // ADR:;;Street;City;State;ZIP;Country
+    if (profile.address) vcfContent += `ADR;TYPE=WORK:;;${profile.address};;;;\n`; 
     
-    // Social profiles using X-SOCIALPROFILE (common but not strictly standard)
     if (profile.linkedin) vcfContent += `X-SOCIALPROFILE;TYPE=linkedin:${ensureHttps(profile.linkedin)}\n`;
     if (profile.twitter) vcfContent += `X-SOCIALPROFILE;TYPE=twitter:${ensureHttps(profile.twitter.startsWith('@') ? `https://twitter.com/${profile.twitter.substring(1)}` : profile.twitter)}\n`;
     if (profile.github) vcfContent += `X-SOCIALPROFILE;TYPE=github:${ensureHttps(profile.github.includes('/') ? profile.github : `https://github.com/${profile.github}`)}\n`;
     
-    // PHOTO: Direct URL. Note: Embedding base64 is more robust but makes VCF large.
-    // if (profile.profilePictureUrl) vcfContent += `PHOTO;MEDIATYPE=image/png:${profile.profilePictureUrl}\n`;
-     if (profile.profilePictureUrl) { // Attempt to fetch and Base64 encode
-        // This part becomes async, which complicates direct VCF generation.
-        // For simplicity, we'll link the photo or skip if direct linking is not universally supported.
-        // For now, we'll stick to a URL or omit.
-        // Actual image embedding is a larger feature.
+    if (profile.profilePictureUrl && !profile.profilePictureUrl.startsWith('data:')) { // Only link if it's a URL, not data URI
          vcfContent += `PHOTO;VALUE=URL:${profile.profilePictureUrl}\n`;
      }
 
-
-    if (profile.userInfo) vcfContent += `NOTE:About Me: ${profile.userInfo.replace(/\n/g, '\\n')}\n`; // Notes can contain newlines, escape them
+    if (profile.userInfo) vcfContent += `NOTE:About Me: ${profile.userInfo.replace(/\n/g, '\\n')}\n`;
 
     vcfContent += 'END:VCARD';
     
@@ -94,13 +83,13 @@ export default function PublicCardPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(link.href); // Clean up
+    URL.revokeObjectURL(link.href);
   };
 
   const ensureHttps = (url: string): string => {
     if (!url) return "";
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      if (url.includes('.') && !url.includes(' ')) { // Basic check for domain-like string
+      if (url.includes('.') && !url.includes(' ')) { 
         return `https://${url}`;
       }
     }
@@ -110,15 +99,15 @@ export default function PublicCardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <Skeleton className="w-full max-w-sm h-[650px] rounded-lg shadow-xl" /> {/* Adjusted height for aspect ratio */}
+      <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 bg-background">
+        <Skeleton className="w-full max-w-sm h-[calc(100vw_*_16/9)] sm:h-[650px] rounded-lg shadow-xl" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <h1 className="text-2xl font-semibold text-destructive mb-4">Error</h1>
         <p className="text-lg text-muted-foreground">{error}</p>
         <a href="/" className="mt-6 text-primary hover:underline">Go to Homepage</a>
@@ -127,8 +116,9 @@ export default function PublicCardPage() {
   }
 
   if (profile && design) {
+    // This div takes full screen and centers the CardPreview
     return (
-      <div className="flex items-center justify-center w-full">
+      <div className="w-full h-screen flex items-center justify-center bg-background">
         <CardPreview 
             profile={profile} 
             design={design} 
@@ -140,11 +130,9 @@ export default function PublicCardPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <p className="text-lg text-muted-foreground">Could not load card data.</p>
          <a href="/" className="mt-6 text-primary hover:underline">Go to Homepage</a>
     </div>
   );
 }
-
-    

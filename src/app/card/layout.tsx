@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'LinkUP Card',
   description: 'View this LinkUP digital business card.',
-  viewport: 'width=device-width, initial-scale=1',
+  viewport: 'width=device-width, initial-scale=1, user-scalable=no', // Added user-scalable=no
 };
 
 export default function CardLayout({
@@ -28,7 +28,8 @@ export default function CardLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       <head /> {/* Basic head, specific meta tags handled by metadata object */}
       <body className="bg-background text-foreground">
-        <main className="min-h-screen flex flex-col items-center justify-center p-4">
+        {/* Removed flex, items-center, justify-center, p-4 to allow full screen content */}
+        <main className="min-h-screen w-screen">
           {children}
         </main>
         <Toaster />
