@@ -5,6 +5,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -13,6 +15,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,12 +45,19 @@ export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
+  const [isAddManualContactDialogOpen, setIsAddManualContactDialogOpen] = useState(false);
+  const [manualContactName, setManualContactName] = useState('');
+  const [manualContactEmail, setManualContactEmail] = useState('');
+  const [manualContactPhone, setManualContactPhone] = useState('');
+  const [manualContactCompany, setManualContactCompany] = useState('');
+  const [manualContactMessage, setManualContactMessage] = useState('');
+  const [isSubmittingManualContact, setIsSubmittingManualContact] = useState(false);
+
   useEffect(() => {
     try {
       const storedContactsRaw = localStorage.getItem(CONTACTS_STORAGE_KEY);
       if (storedContactsRaw) {
         const parsedContacts: ContactInfo[] = JSON.parse(storedContactsRaw);
-        // Sort by most recent first
         parsedContacts.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
         setContacts(parsedContacts);
       }
@@ -61,7 +80,6 @@ export default function ContactsPage() {
   }, [contacts, searchTerm]);
 
   const handleDeleteContact = (contactId: string) => {
-    // Confirm deletion
     if (!window.confirm("Are you sure you want to delete this contact? This action cannot be undone.")) {
         return;
     }
@@ -91,15 +109,71 @@ export default function ContactsPage() {
     }
   };
 
+  const handleOpenManualAddDialog = () => {
+    setManualContactName('');
+    setManualContactEmail('');
+    setManualContactPhone('');
+    setManualContactCompany('');
+    setManualContactMessage('');
+    setIsAddManualContactDialogOpen(true);
+  };
+
+  const handleSubmitManualContact = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!manualContactName.trim() || !manualContactEmail.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide at least Name and Email for the contact.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmittingManualContact(true);
+
+    const newContact: ContactInfo = {
+      id: `manual-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      name: manualContactName,
+      email: manualContactEmail,
+      phone: manualContactPhone || undefined,
+      company: manualContactCompany || undefined,
+      message: manualContactMessage || undefined,
+      submittedFromCardId: 'manual_entry', // Indicate it was a manual entry
+      submittedAt: new Date().toISOString(),
+    };
+
+    try {
+      const updatedContacts = [newContact, ...contacts]; // Add to beginning for recent first
+      updatedContacts.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(updatedContacts));
+      setContacts(updatedContacts);
+
+      toast({
+        title: "Contact Added Manually!",
+        description: `${manualContactName} has been added to your contacts.`,
+      });
+      setIsAddManualContactDialogOpen(false);
+    } catch (e) {
+      console.error("Error saving manual contact to localStorage:", e);
+      toast({
+        title: "Submission Error",
+        description: "Could not save the contact. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingManualContact(false);
+    }
+  };
+
+
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <CardTitle className="flex items-center"><ContactIcon className="mr-2 h-6 w-6 text-primary"/>Collected Contacts</CardTitle>
-            <CardDescription>Contacts received from your digital business cards. Stored locally in your browser.</CardDescription>
+            <CardDescription>Contacts received from your digital business cards or added manually. Stored locally in your browser.</CardDescription>
           </div>
-          <Button disabled> {/* Placeholder for future Add Manually feature */}
+          <Button onClick={handleOpenManualAddDialog}>
             <PlusCircle className="mr-2 h-5 w-5" /> Add Contact Manually
           </Button>
         </div>
@@ -144,7 +218,7 @@ export default function ContactsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem disabled> {/* Placeholder */}
+                        <DropdownMenuItem disabled> {/* Placeholder for future "View Full Details" modal */}
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
@@ -169,7 +243,7 @@ export default function ContactsPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {contacts.length === 0 ? "No contacts collected yet." : `No contacts found for "${searchTerm}".`}
+                    {contacts.length === 0 ? "No contacts collected yet. Click 'Add Contact Manually' to start." : `No contacts found for "${searchTerm}".`}
                   </TableCell>
                 </TableRow>
               )}
@@ -183,6 +257,50 @@ export default function ContactsPage() {
           {/* TODO: Add pagination if list becomes very long */}
         </CardFooter>
       )}
+
+      {/* Manual Add Contact Dialog */}
+      <Dialog open={isAddManualContactDialogOpen} onOpenChange={setIsAddManualContactDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Contact Manually</DialogTitle>
+            <DialogDescription>
+              Enter the details for the new contact.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmitManualContact}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-1">
+                <Label htmlFor="manual-contact-name">Full Name *</Label>
+                <Input id="manual-contact-name" value={manualContactName} onChange={(e) => setManualContactName(e.target.value)} placeholder="Contact's Name" required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="manual-contact-email">Email *</Label>
+                <Input id="manual-contact-email" type="email" value={manualContactEmail} onChange={(e) => setManualContactEmail(e.target.value)} placeholder="contact.email@example.com" required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="manual-contact-phone">Phone (Optional)</Label>
+                <Input id="manual-contact-phone" type="tel" value={manualContactPhone} onChange={(e) => setManualContactPhone(e.target.value)} placeholder="Contact's Phone Number" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="manual-contact-company">Company (Optional)</Label>
+                <Input id="manual-contact-company" value={manualContactCompany} onChange={(e) => setManualContactCompany(e.target.value)} placeholder="Contact's Company Name" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="manual-contact-message">Message/Notes (Optional)</Label>
+                <Textarea id="manual-contact-message" value={manualContactMessage} onChange={(e) => setManualContactMessage(e.target.value)} placeholder="Any relevant notes..." />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isSubmittingManualContact}>Cancel</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSubmittingManualContact}>
+                {isSubmittingManualContact ? 'Adding...' : 'Add Contact'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
