@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon } from 'lucide-react';
+import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus } from 'lucide-react';
 import React from 'react';
 
 const profileSchema = z.object({
@@ -32,6 +32,7 @@ const profileSchema = z.object({
   github: z.string().optional(),
   address: z.string().optional(),
   profilePictureUrl: z.string().url({ message: 'Invalid URL for profile picture.' }).optional().or(z.literal('')),
+  cardBackgroundUrl: z.string().url({ message: 'Invalid URL for card background.' }).optional().or(z.literal('')),
   userInfo: z.string().optional().describe('Information about the user, including their profession and interests for AI assistant.'),
   targetAudience: z.string().optional().describe('The target audience for the business card for AI assistant.'),
 });
@@ -46,28 +47,21 @@ interface UserProfileFormProps {
 export function UserProfileForm({ profile, onProfileChange }: UserProfileFormProps) {
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: profile, // Initial values are set from the profile prop
+    defaultValues: profile,
   });
 
   // Effect 1: Sync form with external profile changes.
-  // This ensures that if the 'profile' prop changes due to template selection or AI updates,
-  // the form fields are reset to reflect these new values. This maintains consistency.
   React.useEffect(() => {
     form.reset(profile);
   }, [profile, form]);
 
   // Effect 2: Implement inline/live editing.
-  // This effect watches for any changes in the form fields. When a field is modified,
-  // 'onProfileChange' is called immediately with the new form data.
-  // This updates the parent component's state, which in turn updates the CardPreview in real-time.
-  // This provides a seamless "inline editing" experience without requiring a separate "Save" button or page navigation.
   React.useEffect(() => {
     const subscription = form.watch((value, { name }) => {
       // Ensure 'onProfileChange' is called only with valid profile data.
-      // 'name' being undefined can indicate a full form update (e.g., after 'reset').
       if (name && profileSchema.shape.hasOwnProperty(name)) {
         onProfileChange(value as UserProfile);
-      } else if (!name) {
+      } else if (!name) { // A full form update (e.g., after 'reset').
         onProfileChange(value as UserProfile);
       }
     });
@@ -82,7 +76,6 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          {/* The form has no onSubmit handler because changes are applied reactively via form.watch */}
           <form className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -223,9 +216,23 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
                 <FormItem>
                   <FormLabel className="flex items-center"><ImageIcon className="mr-2 h-4 w-4" />Profile Picture URL (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. https://placehold.co/100x100.png" {...field} />
+                    <Input placeholder="e.g. https://placehold.co/100x100.png" {...field} data-ai-hint="person portrait" />
                   </FormControl>
                   <FormDescription>Use a direct link to an image. (e.g., https://placehold.co/100x100.png)</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="cardBackgroundUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><ImagePlus className="mr-2 h-4 w-4" />Card Background Image URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. https://placehold.co/600x400.png" {...field} data-ai-hint="abstract background" />
+                  </FormControl>
+                  <FormDescription>Use a direct link to an image for the card background. (e.g., https://placehold.co/600x400.png)</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -267,3 +274,4 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
   );
 }
 
+    

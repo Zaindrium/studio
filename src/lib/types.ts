@@ -11,6 +11,7 @@ export interface UserProfile {
   github: string;
   address: string;
   profilePictureUrl?: string;
+  cardBackgroundUrl?: string; // New: For card background image
   userInfo?: string; // For AI assistant
   targetAudience?: string; // For AI assistant
 }
@@ -23,7 +24,7 @@ export interface CardDesignSettings {
     textColor: string;
     primaryColor: string; // For accents on the card itself
   };
-  qrCodeUrl: string;
+  qrCodeUrl: string; // This remains for internal use, like generating the public card URL
 }
 
 export interface AppTemplate {
@@ -46,6 +47,7 @@ const defaultClassicProfile: UserProfile = {
   github: 'github.com/janedoe',
   address: '123 Main St, Anytown, USA',
   profilePictureUrl: `https://placehold.co/100x100.png`,
+  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
   userInfo: 'A software engineer passionate about web development and open source.',
   targetAudience: 'Tech recruiters, potential clients, and collaborators in the software industry.',
 };
@@ -58,7 +60,7 @@ const defaultClassicDesign: CardDesignSettings = {
     textColor: '#333333',
     primaryColor: '#3F51B5', // Matches app primary
   },
-  qrCodeUrl: '/card/classic-default', 
+  qrCodeUrl: '/card/classic-default',
 };
 
 const creativeProfessionalProfile: UserProfile = {
@@ -72,7 +74,8 @@ const creativeProfessionalProfile: UserProfile = {
   twitter: '@alexcreative',
   github: '',
   address: '789 Art Block, Design District',
-  profilePictureUrl: `https://placehold.co/100x100.png`,
+  profilePictureUrl: `https://placehold.co/120x120.png`, 
+  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
   userInfo: 'Visual storyteller specializing in portrait photography and branding design. Loves vibrant colors and bold statements.',
   targetAudience: 'Art directors, gallery owners, individuals seeking creative visual services.',
 };
@@ -100,6 +103,7 @@ const corporateExecutiveProfile: UserProfile = {
   github: '',
   address: '1 Business Bay, Financial Center',
   profilePictureUrl: `https://placehold.co/100x100.png`,
+  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
   userInfo: 'Experienced CEO with a track record in business transformation and market growth. Focus on data-driven strategies.',
   targetAudience: 'Investors, board members, C-suite executives, industry leaders.',
 };
@@ -142,3 +146,5 @@ export const appTemplates: AppTemplate[] = [
 // These are kept for any direct usage but templates are preferred for initialization
 export const defaultUserProfile: UserProfile = defaultClassicProfile;
 export const defaultCardDesignSettings: CardDesignSettings = defaultClassicDesign;
+
+    
