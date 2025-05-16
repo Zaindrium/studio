@@ -67,6 +67,7 @@ export default function DashboardLayout({
 
   const handleLogout = () => {
     // Add actual logout logic here (e.g., clear tokens, call API)
+    console.log("Logout clicked, redirecting to /login");
     router.push('/login');
   };
 
@@ -84,13 +85,13 @@ export default function DashboardLayout({
             <SidebarMenu>
               {sidebarNavItems.map((item) => {
                 const isPremiumLocked = activePlan === 'free' && item.isPremium;
-                const effectiveLabel = item.label + (isPremiumLocked ? " (Premium)" : "");
+                const tooltipText = isPremiumLocked ? `Upgrade to unlock ${item.label}` : item.label;
                 return (
                   <SidebarMenuItem key={item.href}>
                     <Link href={isPremiumLocked ? "/dashboard/license" : item.href} legacyBehavior passHref>
                       <SidebarMenuButton
                         tooltip={{
-                          children: effectiveLabel,
+                          children: tooltipText,
                           side: "right", 
                           align: "center"
                         }}
