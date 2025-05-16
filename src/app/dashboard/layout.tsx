@@ -28,7 +28,7 @@ const MOCK_USER = {
   name: "Admin User",
   email: "admin@example.com",
   avatarUrl: "https://placehold.co/40x40.png",
-  organizationName: "LinkUP Corp"
+  organizationName: "LinkUP Corp" // This will be used for white-labeling
 };
 
 const sidebarNavItems = [
@@ -78,7 +78,8 @@ export default function DashboardLayout({
           <SidebarHeader className="p-4 flex items-center space-x-3">
               <Link href="/dashboard" className="flex items-center no-underline hover:opacity-90">
                 <LinkIcon className="h-7 w-7 text-primary" />
-                <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">LinkUP</span>
+                {/* Use organizationName for white-labeling */}
+                <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">{user.organizationName}</span>
               </Link>
           </SidebarHeader>
           <SidebarContent className="p-2">
@@ -94,7 +95,7 @@ export default function DashboardLayout({
                           children: tooltipText,
                           side: "right",
                           align: "center",
-                          isLockedFeatureTooltip: isPremiumLocked // Pass this flag
+                          isLockedFeatureTooltip: isPremiumLocked
                         }}
                         isActive={!isPremiumLocked && (pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)))}
                         disabled={isPremiumLocked}
@@ -118,20 +119,22 @@ export default function DashboardLayout({
           </SidebarContent>
           <SidebarSeparator />
           <SidebarFooter className="p-3">
-            <div className="flex items-center space-x-3 group-data-[collapsible=icon]:justify-center">
-              <Avatar className="h-9 w-9">
-                <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="person avatar"/>
-                <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="group-data-[collapsible=icon]:hidden">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-muted-foreground">{user.organizationName}</p>
+            <Link href="/dashboard/settings" className="block hover:bg-sidebar-accent/50 p-2 rounded-md -m-2 transition-colors">
+              <div className="flex items-center space-x-3 group-data-[collapsible=icon]:justify-center">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="person avatar"/>
+                  <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="group-data-[collapsible=icon]:hidden">
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.organizationName}</p>
+                </div>
               </div>
-            </div>
-              <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-2" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4 group-data-[collapsible=icon]:mr-0" />
-                <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
-              </Button>
+            </Link>
+            <Button variant="ghost" className="w-full justify-start mt-2 group-data-[collapsible=icon]:px-2" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4 group-data-[collapsible=icon]:mr-0" />
+              <span className="group-data-[collapsible=icon]:hidden">Log Out</span>
+            </Button>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset className="flex-1 flex flex-col">
