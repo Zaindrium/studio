@@ -17,7 +17,8 @@ const currentLicense = {
   cardLimit: 200,
   cardsUsed: 78,
   renewsOn: "August 30, 2024",
-  pricePerMonth: 49,
+  pricePerMonth: 115, // Changed from 49
+  currencySymbol: "R", // Added currency symbol
 };
 
 export default function LicensePage() {
@@ -61,7 +62,7 @@ export default function LicensePage() {
                 </div>
                 <div className="space-y-1 p-3 bg-secondary/30 rounded-md">
                   <p className="text-muted-foreground">Price:</p>
-                  <p className="font-semibold">${currentLicense.pricePerMonth}/month</p>
+                  <p className="font-semibold">{currentLicense.currencySymbol}{currentLicense.pricePerMonth}/month</p>
                 </div>
                 <div className="space-y-1 p-3 bg-secondary/30 rounded-md">
                   <p className="text-muted-foreground">Renews On:</p>
