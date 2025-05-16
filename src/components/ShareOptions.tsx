@@ -16,7 +16,10 @@ export function ShareOptions({ cardUrl }: ShareOptionsProps) {
   const copyToClipboard = () => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(cardUrl).then(() => {
-        toast({ title: 'Copied!', description: 'Card URL copied to clipboard.' });
+        toast({ 
+          title: 'Copied!', 
+          description: 'Card URL copied! You can paste it in emails, messaging apps, or anywhere else.' 
+        });
       }).catch(err => {
         console.error('Failed to copy: ', err);
         toast({ title: 'Error', description: 'Failed to copy URL.', variant: 'destructive' });
@@ -75,3 +78,4 @@ export function ShareOptions({ cardUrl }: ShareOptionsProps) {
     </div>
   );
 }
+
