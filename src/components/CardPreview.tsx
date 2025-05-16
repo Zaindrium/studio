@@ -4,7 +4,6 @@
 import React from 'react';
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
 import NextImage from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Still used for non-public view
 import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, UserCircle2, Briefcase, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,8 +12,8 @@ import { Button } from '@/components/ui/button';
 interface CardPreviewProps {
   profile: UserProfile;
   design: CardDesignSettings;
-  isPublicView?: boolean; 
-  onSaveContact?: () => void; 
+  isPublicView?: boolean;
+  onSaveContact?: () => void;
 }
 
 const ensureHttps = (url: string) => {
@@ -22,16 +21,16 @@ const ensureHttps = (url: string) => {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
-  if (url.includes('.') && !url.includes(' ')) { 
+  if (url.includes('.') && !url.includes(' ')) {
       return `https://${url}`;
   }
-  return url; 
+  return url;
 };
 
 
 function CardPreviewComponent({ profile, design, isPublicView = false, onSaveContact }: CardPreviewProps) {
   const cardBaseStyle = {
-    backgroundColor: profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') ? 'transparent' : design.colorScheme.cardBackground,
+    backgroundColor: profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') && !profile.cardBackgroundUrl.startsWith('data:') ? 'transparent' : design.colorScheme.cardBackground,
     color: design.colorScheme.textColor,
     borderColor: design.colorScheme.primaryColor,
   };
@@ -39,39 +38,54 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
   const cardBackgroundImageStyle = profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') ? {
     backgroundImage: `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url(${profile.cardBackgroundUrl})`,
   } : {};
-  
-  const textPrimaryColorStyle = { color: design.colorScheme.primaryColor };
-  
-  const isDarkCardBg = design.colorScheme.cardBackground.toLowerCase() === '#0a2342' || design.colorScheme.cardBackground.toLowerCase() === '#000000' || design.colorScheme.cardBackground.startsWith('#0') || design.colorScheme.cardBackground.startsWith('#1') || design.colorScheme.cardBackground.startsWith('#2');
-  const defaultTextColor = isDarkCardBg ? '#FFFFFF' : '#333333';
-  const textColorToUse = (profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co')) ? design.colorScheme.textColor : defaultTextColor;
 
-  const textColorStyle = { 
+  const textPrimaryColorStyle = { color: design.colorScheme.primaryColor };
+
+  // Basic check for dark background colors to improve default text visibility.
+  const isLikelyDarkBg = () => {
+    const bgColor = design.colorScheme.cardBackground.toLowerCase();
+    // Check for common dark hex codes or very low HSL lightness
+    if (bgColor.startsWith('#')) {
+      const r = parseInt(bgColor.substring(1, 3), 16);
+      const g = parseInt(bgColor.substring(3, 5), 16);
+      const b = parseInt(bgColor.substring(5, 7), 16);
+      // A simple brightness formula
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      return brightness < 128; // Threshold for darkness
+    }
+    // Add HSL check if your colors are in HSL format and you can parse it
+    return false; // Default to not dark if format is unknown
+  };
+
+  const defaultTextColor = isLikelyDarkBg() ? '#FFFFFF' : '#333333';
+  // If a background image is set (and not a placeholder or data URI), use the design's text color, otherwise default based on bg.
+  const textColorToUse = (profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') && !profile.cardBackgroundUrl.startsWith('data:'))
+    ? design.colorScheme.textColor
+    : defaultTextColor;
+
+  const textColorStyle = {
     color: textColorToUse
   };
-  
-  const textShadow = (profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co')) ? { textShadow: '0px 1px 3px rgba(0,0,0,0.6)' } : {};
+
+  const textShadow = (profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') && !profile.cardBackgroundUrl.startsWith('data:')) ? { textShadow: '0px 1px 3px rgba(0,0,0,0.6)' } : {};
   const combinedTextStyles = {...textColorStyle, ...textShadow};
 
-  const iconSmallSize = "h-4 w-4 sm:h-5 sm:w-5"; 
+  const iconSmallSize = "h-4 w-4 sm:h-5 sm:w-5";
   const profileImageSizeClass = design.layout === 'image-top' ? "w-24 h-24 sm:w-28 sm:h-28" : "w-20 h-20 sm:w-24 sm:w-24";
   const profilePlaceholderIconSize = design.layout === 'image-top' ? "h-16 w-16" : "h-12 w-12";
-
-  const CardContainer = isPublicView ? 'div' : Card;
-  const cardContainerProps = isPublicView 
-    ? {} 
-    : { className: cn("shadow-xl w-full overflow-hidden sticky top-6") };
 
   const cardContentActual = (
     <div
       className={cn(
         "w-full p-4 sm:p-6 rounded-lg border-2",
-        "flex flex-col justify-between", 
-        "bg-cover bg-center", 
+        "flex flex-col justify-between",
+        "bg-cover bg-center",
         "transform transition-all duration-300",
-        isPublicView 
-          ? "aspect-[9/16] max-w-md shadow-2xl" // For public view, it's inside a full-screen flex container
-          : "aspect-[9/16] max-h-[750px] hover:scale-[1.02] shadow-2xl" // For editor preview
+         // For public view, it's inside a full-screen flex container defined in its page
+         // For editor preview, it has a max height and hover effect
+        isPublicView
+          ? "h-full" // Takes full height from parent which is h-screen
+          : "aspect-[9/16] max-h-[750px] hover:scale-[1.02] shadow-2xl"
       )}
       style={{ ...cardBaseStyle, ...cardBackgroundImageStyle }}
     >
@@ -90,7 +104,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
             <NextImage
               src={profile.profilePictureUrl}
               alt={profile.name || "Profile picture"}
-              width={design.layout === 'image-top' ? 96 : 80} 
+              width={design.layout === 'image-top' ? 96 : 80}
               height={design.layout === 'image-top' ? 96 : 80}
               className={cn("rounded-full object-cover border-2", profileImageSizeClass)}
               style={{ borderColor: design.colorScheme.primaryColor }}
@@ -127,53 +141,55 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
           {profile.company && <p className={cn("text-sm sm:text-md")} style={combinedTextStyles}><Briefcase className="inline h-3 w-3 mr-1" style={textColorStyle} />{profile.company}</p>}
         </div>
       </div>
-      
+
       <div className={cn(
           "my-2 sm:my-3 space-y-1.5 sm:space-y-2 overflow-y-auto px-1 flex-grow",
-          design.layout === 'image-right' ? 'items-end flex flex-col' : design.layout === 'image-left' ? 'items-start flex flex-col' : 'items-center flex flex-col text-center' // Center for image-top
+          design.layout === 'image-right' ? 'items-end flex flex-col' : design.layout === 'image-left' ? 'items-start flex flex-col' : 'items-center flex flex-col text-center'
         )}>
-        {profile.email && (
-          <div className="flex items-center gap-2">
-            <Mail className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <span className={cn("text-xs sm:text-sm break-all")} style={combinedTextStyles}>{profile.email}</span>
-          </div>
-        )}
-        {profile.phone && (
-          <div className="flex items-center gap-2">
-            <Phone className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <span className={cn("text-xs sm:text-sm break-all")} style={combinedTextStyles}>{profile.phone}</span>
-          </div>
-        )}
-        {profile.website && (
-          <div className="flex items-center gap-2">
-            <Globe className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <a href={ensureHttps(profile.website)} target="_blank" rel="noopener noreferrer" className={cn("hover:underline break-all text-xs sm:text-sm")} style={combinedTextStyles}>{profile.website}</a>
-          </div>
-        )}
-        {profile.linkedin && (
-            <div className="flex items-center gap-2">
-            <Linkedin className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <a href={ensureHttps(profile.linkedin)} target="_blank" rel="noopener noreferrer" className={cn("hover:underline break-all text-xs sm:text-sm")} style={combinedTextStyles}>{profile.linkedin}</a>
-          </div>
-        )}
-        {profile.twitter && (
-          <div className="flex items-center gap-2">
-            <Twitter className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <a href={ensureHttps(profile.twitter.startsWith('@') ? `https://twitter.com/${profile.twitter.substring(1)}` : profile.twitter)} target="_blank" rel="noopener noreferrer" className={cn("hover:underline break-all text-xs sm:text-sm")} style={combinedTextStyles}>{profile.twitter}</a>
-          </div>
-        )}
-        {profile.github && (
-          <div className="flex items-center gap-2">
-            <Github className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <a href={ensureHttps(profile.github.includes('/') ? profile.github : `https://github.com/${profile.github}`)} target="_blank" rel="noopener noreferrer" className={cn("hover:underline break-all text-xs sm:text-sm")} style={combinedTextStyles}>{profile.github}</a>
-          </div>
-        )}
-        {profile.address && (
-          <div className="flex items-center gap-2">
-            <MapPin className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-            <span className={cn("text-xs sm:text-sm")} style={combinedTextStyles}>{profile.address}</span>
-          </div>
-        )}
+        {/* Dynamically render contact items */}
+        {[
+          { key: 'email', icon: Mail, value: profile.email, hrefPrefix: 'mailto:' },
+          { key: 'phone', icon: Phone, value: profile.phone, hrefPrefix: 'tel:' },
+          { key: 'website', icon: Globe, value: profile.website, hrefPrefix: '' },
+          { key: 'linkedin', icon: Linkedin, value: profile.linkedin, hrefPrefix: '' },
+          { key: 'twitter', icon: Twitter, value: profile.twitter, hrefPrefix: profile.twitter?.startsWith('@') ? 'https://twitter.com/' : '' , transformValue: (val:string) => val.startsWith('@') ? val.substring(1) : val },
+          { key: 'github', icon: Github, value: profile.github, hrefPrefix: profile.github?.includes('/') ? '' : 'https://github.com/' },
+          { key: 'address', icon: MapPin, value: profile.address },
+        ].map((item) => {
+          if (item.value) {
+            const IconComponent = item.icon;
+            const displayValue = item.transformValue ? item.transformValue(item.value) : item.value;
+            const hrefValue = item.hrefPrefix !== undefined ? ensureHttps(item.hrefPrefix + displayValue) : undefined;
+            
+            return (
+              <div key={item.key} className="flex items-center gap-2">
+                <IconComponent className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
+                {hrefValue ? (
+                  <a href={hrefValue} target="_blank" rel="noopener noreferrer" className={cn("hover:underline break-all text-xs sm:text-sm")} style={combinedTextStyles}>
+                    {item.value}
+                  </a>
+                ) : (
+                  <span className={cn("text-xs sm:text-sm break-all")} style={combinedTextStyles}>
+                    {item.value}
+                  </span>
+                )}
+              </div>
+            );
+          }
+          // Render a placeholder or nothing if you want all icons to always show
+          // For now, only renders if value exists. To show all icons always:
+          // else {
+          //   const IconComponent = item.icon;
+          //   return (
+          //     <div key={item.key} className="flex items-center gap-2 opacity-50">
+          //       <IconComponent className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
+          //       <span className={cn("text-xs sm:text-sm italic")} style={combinedTextStyles}>Not provided</span>
+          //     </div>
+          //   )
+          // }
+          return null;
+        })}
+
         {isPublicView && profile.userInfo && (
           <div className="pt-2 mt-2 border-t w-full" style={{borderColor: design.colorScheme.primaryColor + '50'}}>
             <h3 className="font-semibold text-sm mb-1" style={{...textPrimaryColorStyle, ...textShadow}}>About Me</h3>
@@ -184,7 +200,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
 
       {isPublicView && onSaveContact && (
          <div className="flex-shrink-0 mt-auto pt-3 sm:pt-4">
-           <Button 
+           <Button
             onClick={onSaveContact}
             className="w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors"
             style={{backgroundColor: design.colorScheme.primaryColor, color: design.colorScheme.cardBackground /* Contrast with button bg */}}
@@ -198,20 +214,22 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
   );
 
   if (isPublicView) {
-    return cardContentActual;
+    // The parent container in page.tsx will handle full screen display
+    return (
+        <div className="w-full h-full flex items-center justify-center">
+            {cardContentActual}
+        </div>
+    );
   }
 
+  // Editor Preview
   return (
-    <Card {...cardContainerProps}>
-      {!isPublicView && (
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">Card Preview</CardTitle>
-        </CardHeader>
-      )}
-      <CardContent className={cn("flex flex-col items-center justify-center", isPublicView ? "p-0" : "p-4")}>
+    <div className={cn("shadow-xl w-full overflow-hidden sticky top-6")}>
+        <div className="text-2xl text-center p-4 font-semibold">Card Preview</div>
+      <div className={cn("flex flex-col items-center justify-center p-4")}>
         {cardContentActual}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
