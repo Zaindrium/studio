@@ -5,8 +5,19 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Users, PlusCircle, Search, Settings, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 // Placeholder data for teams
 const MOCK_TEAMS_DATA = [
@@ -16,21 +27,72 @@ const MOCK_TEAMS_DATA = [
   { id: 'team4', name: 'Support Heroes', description: 'Customer support and success.', memberCount: 5, manager: 'David Brown' },
 ];
 
+interface Team {
+  id: string;
+  name: string;
+  description: string;
+  memberCount: number;
+  manager: string;
+}
+
 export default function TeamsPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [teams, setTeams] = useState(MOCK_TEAMS_DATA); // In real app, fetch from API
+  const [teams, setTeams] = useState<Team[]>(MOCK_TEAMS_DATA); // In real app, fetch from API
+  const { toast } = useToast();
+
+  const [isCreateTeamDialogOpen, setIsCreateTeamDialogOpen] = useState(false);
+  const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamDescription, setNewTeamDescription] = useState('');
+  const [newTeamManager, setNewTeamManager] = useState('');
 
   const filteredTeams = teams.filter(team => 
     team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     team.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Placeholder functions for actions
-  const handleCreateTeam = () => console.log("Create new team clicked");
-  const handleManageTeam = (teamId: string) => console.log("Manage team clicked:", teamId);
+  const handleOpenCreateTeamDialog = () => {
+    setNewTeamName('');
+    setNewTeamDescription('');
+    setNewTeamManager('');
+    setIsCreateTeamDialogOpen(true);
+  };
+
+  const handleSaveNewTeam = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newTeamName.trim() || !newTeamDescription.trim() || !newTeamManager.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill out all fields for the new team.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newTeam: Team = {
+      id: `team-${Date.now()}`, // Simple unique ID generation for demo
+      name: newTeamName,
+      description: newTeamDescription,
+      memberCount: 0, // New teams start with 0 members
+      manager: newTeamManager,
+    };
+
+    setTeams(prevTeams => [...prevTeams, newTeam]);
+    toast({
+      title: "Team Created!",
+      description: `The team "${newTeam.name}" has been successfully created.`,
+    });
+    setIsCreateTeamDialogOpen(false);
+  };
+  
   const handleDeleteTeam = (teamId: string) => {
     console.log("Delete team clicked:", teamId);
-    // setTeams(teams.filter(team => team.id !== teamId)); // Example: Optimistic update
+    // In a real app, show a confirmation dialog before deleting
+    setTeams(teams.filter(team => team.id !== teamId)); 
+    toast({
+        title: "Team Deleted",
+        description: "The team has been removed.",
+        variant: "default" 
+    });
   };
 
 
@@ -46,10 +108,72 @@ export default function TeamsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button onClick={handleCreateTeam}>
+        <Button onClick={handleOpenCreateTeamDialog}>
           <PlusCircle className="mr-2 h-5 w-5" /> Create New Team
         </Button>
       </div>
+
+      {/* Create Team Dialog */}
+      <Dialog open={isCreateTeamDialogOpen} onOpenChange={setIsCreateTeamDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Team</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a new team.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveNewTeam}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="teamName" className="text-right col-span-1">
+                  Name
+                </Label>
+                <Input
+                  id="teamName"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  className="col-span-3"
+                  placeholder="e.g., Marketing Team"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="teamDescription" className="text-right col-span-1">
+                  Description
+                </Label>
+                <Input
+                  id="teamDescription"
+                  value={newTeamDescription}
+                  onChange={(e) => setNewTeamDescription(e.target.value)}
+                  className="col-span-3"
+                  placeholder="e.g., Responsible for all marketing activities"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="teamManager" className="text-right col-span-1">
+                  Manager
+                </Label>
+                <Input
+                  id="teamManager"
+                  value={newTeamManager}
+                  onChange={(e) => setNewTeamManager(e.target.value)}
+                  className="col-span-3"
+                  placeholder="e.g., Alex Smith"
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button type="submit">Save Team</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
 
       {filteredTeams.length === 0 && searchTerm && (
         <Card className="text-center py-8">
@@ -71,7 +195,7 @@ export default function TeamsPage() {
             <CardDescription>Get started by creating your first team to organize users and assign resources.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleCreateTeam} size="lg">
+            <Button onClick={handleOpenCreateTeamDialog} size="lg">
               <PlusCircle className="mr-2 h-5 w-5" /> Create Your First Team
             </Button>
           </CardContent>
@@ -88,7 +212,6 @@ export default function TeamsPage() {
                         <CardTitle className="text-xl mb-1">{team.name}</CardTitle>
                     </a>
                 </Link>
-                {/* Quick actions - more can be added in a dropdown */}
               </div>
               <CardDescription className="text-xs text-muted-foreground">Managed by: {team.manager}</CardDescription>
             </CardHeader>
@@ -98,11 +221,12 @@ export default function TeamsPage() {
                 <Users className="mr-2 h-4 w-4 text-primary" />
                 <span>{team.memberCount} Members</span>
               </div>
-              {/* Could add team-specific metrics here if available */}
             </CardContent>
             <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => handleManageTeam(team.id)}>
-                    <Settings className="mr-1 h-4 w-4" /> Manage
+                <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/dashboard/teams/${team.id}`}>
+                        <Settings className="mr-1 h-4 w-4" /> Manage
+                    </Link>
                 </Button>
                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteTeam(team.id)}>
                     <Trash2 className="mr-1 h-4 w-4" /> Delete
