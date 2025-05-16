@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { UserProfile } from '@/lib/types';
@@ -45,24 +46,32 @@ interface UserProfileFormProps {
 export function UserProfileForm({ profile, onProfileChange }: UserProfileFormProps) {
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: profile,
+    defaultValues: profile, // Initial values are set from the profile prop
   });
 
+  // Effect 1: Sync form with external profile changes.
+  // This ensures that if the 'profile' prop changes due to template selection or AI updates,
+  // the form fields are reset to reflect these new values. This maintains consistency.
   React.useEffect(() => {
-    form.reset(profile); // Reset form when profile prop changes externally (e.g. from AI)
+    form.reset(profile);
   }, [profile, form]);
 
-  // Watch for changes to update parent state reactively
+  // Effect 2: Implement inline/live editing.
+  // This effect watches for any changes in the form fields. When a field is modified,
+  // 'onProfileChange' is called immediately with the new form data.
+  // This updates the parent component's state, which in turn updates the CardPreview in real-time.
+  // This provides a seamless "inline editing" experience without requiring a separate "Save" button or page navigation.
   React.useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-       // Check if the changed field is part of the form schema to avoid issues with non-schema fields
+      // Ensure 'onProfileChange' is called only with valid profile data.
+      // 'name' being undefined can indicate a full form update (e.g., after 'reset').
       if (name && profileSchema.shape.hasOwnProperty(name)) {
         onProfileChange(value as UserProfile);
-      } else if (!name) { // If name is undefined, means multiple fields might have changed (e.g. on reset)
+      } else if (!name) {
         onProfileChange(value as UserProfile);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => subscription.unsubscribe(); // Clean up the subscription on unmount
   }, [form, onProfileChange]);
 
 
@@ -73,7 +82,8 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form className="space-y-6"> {/* Removed onSubmit as updates are reactive */}
+          {/* The form has no onSubmit handler because changes are applied reactively via form.watch */}
+          <form className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -256,3 +266,4 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
     </Card>
   );
 }
+
