@@ -2,7 +2,6 @@
 "use client"; 
 
 import React from 'react';
-import type { Metadata } from 'next';
 // Fonts are handled by the root layout
 import '../globals.css';
 // Toaster is handled by the root layout
@@ -51,11 +50,8 @@ const sidebarNavItems = [
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
 ];
 
-// Define metadata for this layout segment
-export const metadata: Metadata = {
-  title: 'LinkUP Business Dashboard',
-  description: 'Manage your LinkUP business account.',
-};
+// Metadata cannot be exported from a Client Component.
+// It should be defined in a Server Component, typically a page.tsx or a parent server layout.tsx.
 
 export default function DashboardLayout({
   children,
