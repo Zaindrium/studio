@@ -31,28 +31,29 @@ export default function LoginPage() {
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
     // SIMULATED SUCCESS & REDIRECTION LOGIC
-    // In a real app, you'd get user data and account type from the backend.
-    // For this simulation, we'll infer account type from email.
-    const isBusinessAccount = email.toLowerCase().includes('business.com') || email.toLowerCase().includes('corp.com'); // Example heuristic
-
-    if (isBusinessAccount) {
+    if (email.toLowerCase() === 'user@example.com' && password === 'password123') {
       toast({
-        title: "Login Successful!",
+        title: "Personal Login Successful!",
+        description: "Redirecting to the Card Editor...",
+        variant: "default",
+      });
+      router.push('/editor');
+    } else if (email.toLowerCase() === 'admin@business.com' && password === 'password123') {
+      toast({
+        title: "Business Login Successful!",
         description: "Redirecting to your Business Dashboard...",
         variant: "default",
       });
       router.push('/dashboard');
     } else {
-      toast({
-        title: "Login Successful!",
-        description: "Redirecting to the Card Editor...",
-        variant: "default",
+      toast({ 
+        title: "Login Failed", 
+        description: "Invalid email or password. Try user@example.com or admin@business.com with password 'password123'.", 
+        variant: "destructive",
+        duration: 7000,
       });
-      router.push('/editor');
+      setIsLoading(false);
     }
-    // In a real error scenario:
-    // toast({ title: "Login Failed", description: "Invalid email or password.", variant: "destructive" });
-    // setIsLoading(false);
   };
 
   return (
@@ -62,7 +63,8 @@ export default function LoginPage() {
           <LogIn className="mr-2 h-6 w-6 text-primary" /> Log In to LinkUP
         </CardTitle>
         <CardDescription>
-          Enter your credentials to access your account.
+          Enter your credentials to access your account. <br/>
+          (Try: user@example.com or admin@business.com, Pass: password123)
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -72,7 +74,7 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="you@example.com or admin@business.com"
+              placeholder="user@example.com or admin@business.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -83,7 +85,7 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="password123"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
