@@ -3,11 +3,13 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Eye, QrCode, Share2, Users, CreditCard, BarChart3, Percent } from 'lucide-react';
+import { Eye, QrCode, Share2, Users, CreditCard, BarChart3 } from 'lucide-react'; // Removed Percent as it's not directly used for an icon here
+import { Button } from "@/components/ui/button"; // Added missing Button import
+import Link from 'next/link'; // Added missing Link import
 // Assuming a chart component exists, e.g., from shadcn/ui/chart
 // import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
-import { BarChart, Bar, Rectangle, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
+import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts'; // Aliased BarChart to avoid conflict if any
 
 
 // Placeholder data for charts - in a real app, this would come from an API / state management
@@ -105,7 +107,7 @@ export default function DashboardPage() {
           <CardContent className="h-[350px] w-full">
             <ChartContainer config={chartConfig} className="h-full w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weeklyActivityData}>
+                    <RechartsBarChart data={weeklyActivityData}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} />
                         <YAxis tickLine={false} axisLine={false} tickMargin={8}/>
@@ -114,7 +116,7 @@ export default function DashboardPage() {
                         <Bar dataKey="views" fill="var(--color-views)" radius={4} />
                         <Bar dataKey="scans" fill="var(--color-scans)" radius={4} />
                         <Bar dataKey="shares" fill="var(--color-shares)" radius={4} />
-                    </BarChart>
+                    </RechartsBarChart>
                 </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
@@ -170,3 +172,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
