@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, Link as LinkIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import type { StaffRecord, StaffRole, UserStatus, Team } from '@/lib/app-types'; // Updated to StaffRecord
-import Link from 'next/link'; // Import Link
+import type { StaffRecord, StaffRole, UserStatus, Team, AdminUser } from '@/lib/app-types';
+import Link from 'next/link';
 import { sanitizeForUrl } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -54,35 +54,55 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { db } from '@/lib/firebase'; // Import Firestore instance
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  addDoc, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  serverTimestamp, 
+  Timestamp 
+} from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
+// Simulated admin user data - replace with actual auth context later
+// This MOCK_ADMIN_USER provides the companyId needed for Firestore queries.
+const MOCK_ADMIN_USER: AdminUser & { organizationName: string } = {
+  id: "admin-user-123",
+  companyId: "company-abc-789", // CRUCIAL: This needs to match a companyId in your Firestore
+  organizationName: "LinkUP Corp", 
+  name: "Admin LoggedIn",
+  email: "admin@examplecorp.com",
+  role: 'Owner', 
+  status: 'Active',
+  createdAt: new Date().toISOString(),
+};
 
-// MOCK_USERS_DATA now represents StaffRecord[]
-const MOCK_STAFF_DATA: StaffRecord[] = [
-  { id: 'user1', name: 'John Doe', email: 'john.doe@example.com', role: 'Employee', status: 'Active', teamId: 'team1', lastLoginAt: '2024-07-28 10:00 AM', cardsCreatedCount: 5, createdAt: '2023-01-15', fingerprintUrl: 'john-doe-staff-card' },
-  { id: 'user2', name: 'Jane Roe', email: 'jane.roe@example.com', role: 'Manager', status: 'Active', teamId: 'team1', lastLoginAt: '2024-07-29 09:00 AM', cardsCreatedCount: 3, createdAt: '2023-01-20', fingerprintUrl: 'jane-roe-manager-card' },
-  { id: 'user3', name: 'Mike Chan', email: 'mike.chan@example.com', role: 'Employee', status: 'Active', teamId: 'team2', lastLoginAt: '2024-07-29 11:00 AM', cardsCreatedCount: 10, createdAt: '2023-02-01', fingerprintUrl: 'mike-chan-card' },
-  { id: 'user4', name: 'Sarah Lee', email: 'sarah.lee@example.com', role: 'Employee', status: 'Invited', teamId: 'team2', lastLoginAt: '-', cardsCreatedCount: 0, createdAt: '2024-07-25', fingerprintUrl: 'sarah-lee-pending' },
-  { id: 'user5', name: 'Tom Wilson', email: 'tom.wilson@example.com', role: 'Contractor', status: 'Inactive', teamId: 'team1', lastLoginAt: '2024-06-01 03:00 PM', cardsCreatedCount: 1, createdAt: '2023-03-10', fingerprintUrl: 'tom-wilson-inactive' },
-];
 
 const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team1', name: 'Sales Team Alpha' },
   { id: 'team2', name: 'Marketing Crew Gamma' },
   { id: 'team3', name: 'Engineering Squad Beta' },
+  // In a real app, these would be fetched from /companies/{companyId}/teams
 ];
 
-// Form state now aligns more with StaffRecord properties
 const initialNewStaffState: Partial<StaffRecord> & { teamId: string } = {
     name: '',
     email: '',
-    role: 'Employee', // Default StaffRole
+    role: 'Employee',
     teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team',
-    fingerprintUrl: '', // This would likely be auto-generated in a real backend
+    fingerprintUrl: '',
+    status: 'Invited',
 };
 
 
 export default function UsersPage() {
-  const [staffList, setStaffList] = useState<StaffRecord[]>(MOCK_STAFF_DATA);
+  const [staffList, setStaffList] = useState<StaffRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -92,11 +112,47 @@ export default function UsersPage() {
   const [isDeleteStaffAlertOpen, setIsDeleteStaffAlertOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffRecord | null>(null);
 
+  const adminUser = MOCK_ADMIN_USER; // Using mock admin for companyId
+
+  const fetchStaff = useCallback(async () => {
+    if (!adminUser.companyId) {
+      toast({ title: "Error", description: "Company ID not found for admin.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const staffCollectionRef = collection(db, `companies/${adminUser.companyId}/staff`);
+      const q = query(staffCollectionRef); // Add ordering or filtering if needed
+      const querySnapshot = await getDocs(q);
+      const fetchedStaff: StaffRecord[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedStaff.push({ 
+          id: doc.id, 
+          ...data,
+          createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+          updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString(),
+          lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt,
+        } as StaffRecord);
+      });
+      setStaffList(fetchedStaff);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      toast({ title: "Error", description: "Could not fetch staff list.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [adminUser.companyId, toast]);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   const filteredStaffList = useMemo(() => {
     return staffList.filter(staff =>
-      staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      staff.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (staff.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (staff.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [staffList, searchTerm]);
 
@@ -107,8 +163,9 @@ export default function UsersPage() {
         name: staffToEdit.name,
         email: staffToEdit.email,
         role: staffToEdit.role,
+        status: staffToEdit.status,
         teamId: staffToEdit.teamId || 'no-team', 
-        fingerprintUrl: staffToEdit.fingerprintUrl, // Include for editing consistency
+        fingerprintUrl: staffToEdit.fingerprintUrl,
       });
     } else {
       setEditingStaff(null);
@@ -122,54 +179,48 @@ export default function UsersPage() {
     setNewStaffForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveStaff = (event: React.FormEvent) => {
+  const handleSaveStaff = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!newStaffForm.name?.trim() || !newStaffForm.email?.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill out Name and Email for the staff member.",
-        variant: "destructive",
-      });
+      toast({ title: "Missing Information", description: "Name and Email are required.", variant: "destructive" });
+      return;
+    }
+    if (!adminUser.companyId) {
+      toast({ title: "Error", description: "Company ID not found for admin.", variant: "destructive" });
       return;
     }
 
-    const staffTeamIdToSave = newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId;
-    const fingerprint = newStaffForm.fingerprintUrl || sanitizeForUrl(newStaffForm.name || 'new-staff');
+    const staffDataToSave: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount'> & { teamId?: string, updatedAt?: Timestamp, createdAt?: Timestamp } = {
+      name: newStaffForm.name,
+      email: newStaffForm.email,
+      role: newStaffForm.role || 'Employee',
+      teamId: newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId,
+      status: editingStaff ? newStaffForm.status || editingStaff.status : 'Invited',
+      fingerprintUrl: newStaffForm.fingerprintUrl || sanitizeForUrl(newStaffForm.name || `staff-${Date.now()}`),
+    };
 
-
-    if (editingStaff) {
-      setStaffList(staffList.map(s => s.id === editingStaff.id ? { 
-          ...editingStaff, 
-          ...newStaffForm, 
-          teamId: staffTeamIdToSave, 
-          fingerprintUrl: newStaffForm.fingerprintUrl || editingStaff.fingerprintUrl, // Keep existing if not changed
-          updatedAt: new Date().toISOString().split('T')[0] 
-        } as StaffRecord : s));
-      toast({
-        title: "Staff Member Updated!",
-        description: `Staff member "${newStaffForm.name}" has been successfully updated.`,
-      });
-    } else {
-      const newStaffMember: StaffRecord = {
-        id: `staff-${Date.now()}`,
-        name: newStaffForm.name || '',
-        email: newStaffForm.email || '',
-        role: newStaffForm.role || 'Employee',
-        teamId: staffTeamIdToSave, 
-        status: 'Invited', 
-        fingerprintUrl: fingerprint,
-        createdAt: new Date().toISOString().split('T')[0], 
-        cardsCreatedCount: 0, // Default for new staff
-        lastLoginAt: '-', // Staff might not log in
-      };
-
-      setStaffList(prevStaff => [newStaffMember, ...prevStaff]);
-      toast({
-        title: "Staff Member Added!",
-        description: `Staff member "${newStaffMember.name}" has been added. Their card URL is /card/${newStaffMember.fingerprintUrl}`,
-      });
+    try {
+      if (editingStaff) {
+        const staffDocRef = doc(db, `companies/${adminUser.companyId}/staff`, editingStaff.id);
+        await updateDoc(staffDocRef, { ...staffDataToSave, updatedAt: serverTimestamp() });
+        toast({ title: "Staff Updated", description: `${newStaffForm.name} has been updated.` });
+      } else {
+        const staffCollectionRef = collection(db, `companies/${adminUser.companyId}/staff`);
+        await addDoc(staffCollectionRef, { 
+          ...staffDataToSave, 
+          cardsCreatedCount: 0,
+          lastLoginAt: '-', // Or serverTimestamp() if they are "active" immediately
+          createdAt: serverTimestamp(), 
+          updatedAt: serverTimestamp() 
+        });
+        toast({ title: "Staff Added", description: `${newStaffForm.name} has been added.` });
+      }
+      setIsAddStaffDialogOpen(false);
+      fetchStaff(); // Re-fetch to update the list
+    } catch (error) {
+      console.error("Error saving staff:", error);
+      toast({ title: "Error Saving Staff", description: "Could not save staff details.", variant: "destructive" });
     }
-    setIsAddStaffDialogOpen(false);
   };
   
   const confirmDeleteStaff = (staff: StaffRecord) => {
@@ -177,15 +228,20 @@ export default function UsersPage() {
     setIsDeleteStaffAlertOpen(true);
   };
   
-  const handleDeleteStaff = () => {
-    if (!staffToDelete) return;
-    setStaffList(staffList.filter(staff => staff.id !== staffToDelete.id));
-    toast({
-        title: "Staff Member Deleted",
-        description: `Staff member "${staffToDelete.name}" has been removed. (Simulation)`,
-    });
-    setIsDeleteStaffAlertOpen(false);
-    setStaffToDelete(null);
+  const handleDeleteStaff = async () => {
+    if (!staffToDelete || !adminUser.companyId) return;
+    try {
+      const staffDocRef = doc(db, `companies/${adminUser.companyId}/staff`, staffToDelete.id);
+      await deleteDoc(staffDocRef);
+      toast({ title: "Staff Deleted", description: `${staffToDelete.name} has been removed.` });
+      fetchStaff(); // Re-fetch
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      toast({ title: "Error Deleting Staff", description: "Could not remove staff.", variant: "destructive" });
+    } finally {
+      setIsDeleteStaffAlertOpen(false);
+      setStaffToDelete(null);
+    }
   };
 
   const getTeamNameById = (teamId?: string) => {
@@ -193,7 +249,7 @@ export default function UsersPage() {
     return MOCK_TEAMS_FOR_SELECT.find(t => t.id === teamId)?.name || 'Unknown Team';
   };
   
-  const getStatusVariant = (status: UserStatus): "default" | "secondary" | "outline" | "destructive" => {
+  const getStatusVariant = (status?: UserStatus): "default" | "secondary" | "outline" | "destructive" => {
     switch (status) {
       case 'Active': return 'default'; 
       case 'Invited': return 'secondary';
@@ -201,6 +257,23 @@ export default function UsersPage() {
       default: return 'secondary';
     }
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-10 w-1/3 mb-4" />
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
 
   return (
@@ -235,7 +308,7 @@ export default function UsersPage() {
                 <TableHead>Role</TableHead>
                 <TableHead>Team</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Card URL</TableHead> {/* New Column */}
+                <TableHead>Card URL</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -277,8 +350,7 @@ export default function UsersPage() {
                          <DropdownMenuSeparator />
                         <DropdownMenuItem 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => confirmDeleteStaff(staff)}
-                            onSelect={(e) => e.preventDefault()} 
+                            onClick={(e) => { e.preventDefault(); confirmDeleteStaff(staff); }}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete Staff
@@ -289,7 +361,7 @@ export default function UsersPage() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center"> {/* Updated colSpan */}
+                  <TableCell colSpan={7} className="h-24 text-center">
                     {searchTerm ? `No staff found for "${searchTerm}".` : "No staff members yet. Click 'Add New Staff' to start."}
                   </TableCell>
                 </TableRow>
@@ -348,10 +420,27 @@ export default function UsersPage() {
                     <SelectItem value="Employee">Employee</SelectItem>
                     <SelectItem value="Manager">Manager</SelectItem>
                     <SelectItem value="Contractor">Contractor</SelectItem>
-                    {/* Add other relevant staff roles */}
                   </SelectContent>
                 </Select>
               </div>
+               {editingStaff && (
+                <div className="space-y-2">
+                    <Label htmlFor="staffStatus">Status</Label>
+                    <Select
+                    value={newStaffForm.status}
+                    onValueChange={(value) => handleFormChange('status', value as UserStatus)}
+                    >
+                    <SelectTrigger id="staffStatus">
+                        <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Invited">Invited</SelectItem>
+                        <SelectItem value="Inactive">Inactive</SelectItem>
+                    </SelectContent>
+                    </Select>
+                </div>
+                )}
               <div className="space-y-2">
                 <Label htmlFor="staffTeam">Assign to Team</Label>
                 <Select
@@ -409,3 +498,5 @@ export default function UsersPage() {
     </Card>
   );
 }
+
+    
