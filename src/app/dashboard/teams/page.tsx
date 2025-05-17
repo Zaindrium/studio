@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Users, PlusCircle, Search, Settings, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import {
-  Dialog, // Add Dialog if it was missing
+  Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -17,85 +17,155 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import type { Team, StaffRecord } from '@/lib/app-types';
+import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Placeholder data for teams
-const MOCK_TEAMS_DATA = [
-  { id: 'team1', name: 'Sales Team Alpha', description: 'Handles all sales operations.', memberCount: 12, manager: 'Alice Smith' },
-  { id: 'team2', name: 'Marketing Crew Gamma', description: 'Digital and content marketing.', memberCount: 8, manager: 'Bob Johnson' },
-  { id: 'team3', name: 'Engineering Squad Beta', description: 'Product development and R&D.', memberCount: 25, manager: 'Carol White' },
-  { id: 'team4', name: 'Support Heroes', description: 'Customer support and success.', memberCount: 5, manager: 'David Brown' },
+
+const MOCK_TEAMS_DATA: Team[] = [
+  { id: 'team1', name: 'Sales Team Alpha', description: 'Handles all sales operations.', memberCount: 12, managerName: 'Alice Smith', managerId: 'staff-alice' },
+  { id: 'team2', name: 'Marketing Crew Gamma', description: 'Digital and content marketing.', memberCount: 8, managerName: 'Bob Johnson', managerId: 'staff-bob' },
+  { id: 'team3', name: 'Engineering Squad Beta', description: 'Product development and R&D.', memberCount: 25, managerName: 'Carol White', managerId: 'staff-carol' },
+  { id: 'team4', name: 'Support Heroes', description: 'Customer support and success.', memberCount: 5, managerName: 'David Brown', managerId: 'staff-david' },
 ];
 
-interface Team {
-  id: string;
+interface NewTeamFormState {
   name: string;
   description: string;
-  memberCount: number;
-  manager: string;
+  managerId?: string;
 }
 
-// Dynamically import the Dialog and its content
-// const LazyCreateTeamDialog = lazy(() => import('@/components/dashboard/teams/CreateTeamDialog'));
-// Note: Since CreateTeamDialog is not a separate component yet, we use the built-in Dialog for now.
+const initialNewTeamState: NewTeamFormState = {
+    name: '',
+    description: '',
+    managerId: '',
+};
 
 export default function TeamsPage() {
+  const { currentUser, companyId, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [teams, setTeams] = useState<Team[]>(MOCK_TEAMS_DATA); // In real app, fetch from API
+  const [teams, setTeams] = useState<Team[]>(MOCK_TEAMS_DATA); 
   const { toast } = useToast();
 
   const [isCreateTeamDialogOpen, setIsCreateTeamDialogOpen] = useState(false);
-  const [newTeamName, setNewTeamName] = useState('');
-  const [newTeamDescription, setNewTeamDescription] = useState('');
-  const [newTeamManager, setNewTeamManager] = useState('');
+  const [newTeamForm, setNewTeamForm] = useState<NewTeamFormState>(initialNewTeamState);
+  const [staffList, setStaffList] = useState<StaffRecord[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
 
-  const filteredTeams = teams.filter(team => 
+  const fetchStaff = useCallback(async () => {
+    if (!companyId) {
+        if (!authLoading) {
+            toast({ title: "Error", description: "Company ID not available to fetch staff for team manager selection.", variant: "destructive" });
+        }
+        return;
+    }
+    setIsLoadingStaff(true);
+    try {
+      const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
+      const q = query(staffCollectionRef);
+      const querySnapshot = await getDocs(q);
+      const fetchedStaff: StaffRecord[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedStaff.push({
+          id: doc.id,
+          ...data,
+          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
+          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
+          lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt || '-',
+        } as StaffRecord);
+      });
+      setStaffList(fetchedStaff);
+      if (fetchedStaff.length > 0 && !newTeamForm.managerId) {
+        setNewTeamForm(prev => ({...prev, managerId: fetchedStaff[0].id}));
+      } else if (fetchedStaff.length === 0) {
+        setNewTeamForm(prev => ({...prev, managerId: ''}));
+      }
+    } catch (error) {
+      console.error("Error fetching staff for manager selection:", error);
+      toast({ title: "Error", description: "Could not fetch staff list for manager selection.", variant: "destructive" });
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  }, [companyId, toast, authLoading, newTeamForm.managerId]);
+
+  useEffect(() => {
+    if (!authLoading && companyId) {
+        fetchStaff();
+    }
+  }, [authLoading, companyId, fetchStaff]);
+
+
+  const filteredTeams = teams.filter(team =>
     team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     team.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleOpenCreateTeamDialog = () => {
-    setNewTeamName('');
-    setNewTeamDescription('');
-    setNewTeamManager('');
+    setNewTeamForm({...initialNewTeamState, managerId: staffList.length > 0 ? staffList[0].id : ''});
     setIsCreateTeamDialogOpen(true);
+  };
+
+  const handleFormChange = (field: keyof NewTeamFormState, value: string) => {
+    setNewTeamForm(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSaveNewTeam = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newTeamName.trim() || !newTeamDescription.trim() || !newTeamManager.trim()) {
+    if (!newTeamForm.name?.trim() || !newTeamForm.description?.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please fill out all fields for the new team.",
+        description: "Please fill out Name and Description for the new team.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!newTeamForm.managerId) {
+      toast({
+        title: "Manager Required",
+        description: "Please select a manager for the new team.",
         variant: "destructive",
       });
       return;
     }
 
+    const manager = staffList.find(staff => staff.id === newTeamForm.managerId);
+
     const newTeam: Team = {
-      id: `team-${Date.now()}`, // Simple unique ID generation for demo
-      name: newTeamName,
-      description: newTeamDescription,
-      memberCount: 0, // New teams start with 0 members
-      manager: newTeamManager,
+      id: `team-${Date.now()}`,
+      name: newTeamForm.name,
+      description: newTeamForm.description,
+      memberCount: 0,
+      managerId: newTeamForm.managerId,
+      managerName: manager?.name || 'N/A',
+      createdAt: new Date().toISOString(),
     };
 
-    setTeams(prevTeams => [...prevTeams, newTeam]);
+    setTeams(prevTeams => [newTeam, ...prevTeams]);
     toast({
       title: "Team Created!",
       description: `The team "${newTeam.name}" has been successfully created.`,
     });
     setIsCreateTeamDialogOpen(false);
   };
-  
+
   const handleDeleteTeam = (teamId: string) => {
-    console.log("Delete team clicked:", teamId);
-    // In a real app, show a confirmation dialog before deleting
-    setTeams(teams.filter(team => team.id !== teamId)); 
+    // Add confirmation dialog here in a real app
+    setTeams(teams.filter(team => team.id !== teamId));
     toast({
         title: "Team Deleted",
-        description: "The team has been removed.",
-        variant: "default" 
+        description: "The team has been removed. (Simulation)",
+        variant: "default"
     });
   };
 
@@ -105,21 +175,20 @@ export default function TeamsPage() {
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search teams by name or description..." 
+          <Input
+            placeholder="Search teams by name or description..."
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button onClick={handleOpenCreateTeamDialog}>
+        <Button onClick={handleOpenCreateTeamDialog} disabled={isLoadingStaff || !companyId}>
           <PlusCircle className="mr-2 h-5 w-5" /> Create New Team
         </Button>
       </div>
 
-      {/* Create Team Dialog */}
       <Dialog open={isCreateTeamDialogOpen} onOpenChange={setIsCreateTeamDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Create New Team</DialogTitle>
             <DialogDescription>
@@ -128,51 +197,54 @@ export default function TeamsPage() {
           </DialogHeader>
           <form onSubmit={handleSaveNewTeam}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="teamName" className="text-right col-span-1">
-                  Name
-                </Label>
+              <div className="space-y-2">
+                <Label htmlFor="newTeamName">Team Name</Label>
                 <Input
-                  id="teamName"
-                  value={newTeamName}
-                  onChange={(e) => setNewTeamName(e.target.value)}
-                  className="col-span-3"
+                  id="newTeamName"
+                  value={newTeamForm.name}
+                  onChange={(e) => handleFormChange('name', e.target.value)}
                   placeholder="e.g., Marketing Team"
                   required
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="teamDescription" className="text-right col-span-1">
-                  Description
-                </Label>
+              <div className="space-y-2">
+                <Label htmlFor="newTeamDescription">Description</Label>
                 <Input
-                  id="teamDescription"
-                  value={newTeamDescription}
-                  onChange={(e) => setNewTeamDescription(e.target.value)}
-                  className="col-span-3"
+                  id="newTeamDescription"
+                  value={newTeamForm.description}
+                  onChange={(e) => handleFormChange('description', e.target.value)}
                   placeholder="e.g., Responsible for all marketing activities"
                   required
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="teamManager" className="text-right col-span-1">
-                  Manager
-                </Label>
-                <Input
-                  id="teamManager"
-                  value={newTeamManager}
-                  onChange={(e) => setNewTeamManager(e.target.value)}
-                  className="col-span-3"
-                  placeholder="e.g., Alex Smith"
-                  required
-                />
+              <div className="space-y-2">
+                <Label htmlFor="newTeamManager">Manager</Label>
+                {isLoadingStaff ? (
+                    <Skeleton className="h-10 w-full" />
+                ) : staffList.length > 0 ? (
+                    <Select
+                        value={newTeamForm.managerId}
+                        onValueChange={(value) => handleFormChange('managerId', value)}
+                    >
+                        <SelectTrigger id="newTeamManager">
+                        <SelectValue placeholder="Select a manager" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        {staffList.map(staff => (
+                            <SelectItem key={staff.id} value={staff.id}>{staff.name} ({staff.email})</SelectItem>
+                        ))}
+                        </SelectContent>
+                    </Select>
+                ) : (
+                    <p className="text-sm text-muted-foreground">No staff available to assign as manager. Please add staff first.</p>
+                )}
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit">Save Team</Button>
+              <Button type="submit" disabled={isLoadingStaff || (staffList.length === 0 && !newTeamForm.managerId)}>Save Team</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -199,7 +271,7 @@ export default function TeamsPage() {
             <CardDescription>Get started by creating your first team to organize users and assign resources.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleOpenCreateTeamDialog} size="lg">
+            <Button onClick={handleOpenCreateTeamDialog} size="lg" disabled={isLoadingStaff || !companyId}>
               <PlusCircle className="mr-2 h-5 w-5" /> Create Your First Team
             </Button>
           </CardContent>
@@ -217,7 +289,7 @@ export default function TeamsPage() {
                     </a>
                 </Link>
               </div>
-              <CardDescription className="text-xs text-muted-foreground">Managed by: {team.manager}</CardDescription>
+              <CardDescription className="text-xs text-muted-foreground">Managed by: {team.managerName || 'N/A'}</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
               <p className="text-sm text-muted-foreground mb-3 min-h-[40px]">{team.description}</p>
@@ -242,3 +314,5 @@ export default function TeamsPage() {
     </div>
   );
 }
+
+    

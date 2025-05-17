@@ -17,7 +17,7 @@ export interface StaffCardData {
   profilePictureUrl?: string;
   cardBackgroundUrl?: string;
   userInfo?: string;
-  targetAudience?: string; 
+  targetAudience?: string;
 }
 
 export interface CardDesignSettings {
@@ -28,7 +28,7 @@ export interface CardDesignSettings {
     textColor: string;
     primaryColor: string;
   };
-  qrCodeUrl: string; 
+  qrCodeUrl: string;
 }
 
 // Represents an Organization/Company in Firebase
@@ -44,17 +44,17 @@ export interface CompanyProfile {
 }
 
 // Represents an Admin User in Firebase
-export type AdminRole = 'Owner' | 'Admin' | 'BillingManager'; 
+export type AdminRole = 'Owner' | 'Admin' | 'BillingManager';
 export type UserStatus = 'Active' | 'Invited' | 'Inactive';
 
-export interface AdminUser { 
+export interface AdminUser {
   id: string; // adminId (usually user.uid)
   companyId: string;
   companyName?: string; // For convenience, can be denormalized or fetched
   name: string;
   email: string;
   emailVerified?: boolean;
-  role: AdminRole; 
+  role: AdminRole;
   status: UserStatus;
   profilePictureUrl?: string;
   lastLoginAt?: string | any; // string representation or Firestore Timestamp
@@ -63,19 +63,19 @@ export interface AdminUser {
 }
 
 // Represents a Staff Record in Firebase (managed by Admins, no login)
-export type StaffRole = 'Employee' | 'Manager' | 'Contractor' 
+export type StaffRole = 'Employee' | 'Manager' | 'Contractor'
 export interface StaffRecord {
-  id: string; 
+  id: string;
   // companyId is implicit from the path: companies/{companyId}/staff/{staffId}
   name: string;
-  email: string; 
-  role: StaffRole; 
-  teamId?: string; 
-  status: UserStatus; 
-  fingerprintUrl: string; 
-  uniqueNfcIdentifier?: string; 
-  assignedCardId?: string; 
-  cardsCreatedCount?: number; 
+  email: string;
+  role: StaffRole;
+  teamId?: string;
+  status: UserStatus;
+  fingerprintUrl: string;
+  uniqueNfcIdentifier?: string;
+  assignedCardId?: string;
+  cardsCreatedCount?: number;
   lastLoginAt?: string | any; // This might not be relevant if staff don't log in.
   createdAt: string | any;
   updatedAt?: string | any;
@@ -86,13 +86,13 @@ export interface StaffRecord {
 export interface DigitalBusinessCardRecord {
   id: string; // cardId
   // companyId is implicit
-  staffRecordId: string; 
-  templateId?: string; 
-  customFields?: Record<string, any>; 
-  cardData: StaffCardData; 
-  designSettings: CardDesignSettings; 
-  isActive: boolean; 
-  nfcTagId?: string; 
+  staffRecordId: string;
+  templateId?: string;
+  customFields?: Record<string, any>;
+  cardData: StaffCardData;
+  designSettings: CardDesignSettings;
+  isActive: boolean;
+  nfcTagId?: string;
   createdAt: any;
   updatedAt: any;
 }
@@ -103,17 +103,17 @@ export interface CardTemplateRecord {
   // companyId is implicit
   name: string;
   description?: string;
-  designSettings: CardDesignSettings; 
-  defaultFields?: Partial<StaffCardData>; 
+  designSettings: CardDesignSettings;
+  defaultFields?: Partial<StaffCardData>;
   isDefault?: boolean;
   createdAt: any;
   updatedAt: any;
 }
 
 
-export interface AccessCode { 
+export interface AccessCode {
     code: string;
-    userId: string; 
+    userId: string;
     companyId: string;
     isUsed: boolean;
     expiresAt?: string;
@@ -125,7 +125,7 @@ export interface AppTemplate {
   id: string;
   name: string;
   description: string;
-  profile: StaffCardData; 
+  profile: StaffCardData;
   design: CardDesignSettings;
 }
 
@@ -143,7 +143,7 @@ const defaultClassicStaffCard: StaffCardData = {
   github: '',
   address: '123 Business Rd, Suite 100',
   profilePictureUrl: `https://placehold.co/100x100.png`,
-  cardBackgroundUrl: ``,
+  cardBackgroundUrl: ``, // Updated: Default no background
   userInfo: 'Dedicated sales professional helping businesses grow.',
   targetAudience: 'Clients and Partners',
 };
@@ -156,7 +156,7 @@ const defaultClassicDesign: CardDesignSettings = {
     textColor: '#333333',
     primaryColor: '#3F51B5',
   },
-  qrCodeUrl: '/card/classic-default-staff', 
+  qrCodeUrl: '/card/classic-default-staff',
 };
 
 const creativeProfessionalStaffCard: StaffCardData = {
@@ -171,7 +171,7 @@ const creativeProfessionalStaffCard: StaffCardData = {
   github: '',
   address: '456 Art Avenue, Creative City',
   profilePictureUrl: `https://placehold.co/120x120.png`,
-  cardBackgroundUrl: ``,
+  cardBackgroundUrl: ``, // Updated: Default no background
   userInfo: 'Innovative marketing specialist driving brand engagement.',
   targetAudience: 'Creative Community',
 };
@@ -211,13 +211,13 @@ export const defaultCardDesignSettings: CardDesignSettings = defaultClassicDesig
 // For Dashboard User/Admin list display
 // This specific `AuthenticatedAdminInfo` type is for the LOGGED-IN ADMIN USER's info,
 // not for the list of staff they manage. For staff, use `StaffRecord`.
-export interface AuthenticatedAdminInfo { 
+export interface AuthenticatedAdminInfo {
   id: string; // adminId / uid
-  companyId: string; 
-  organizationName: string; 
+  companyId: string;
+  organizationName: string;
   name: string;
   email: string;
-  role: AdminRole; 
+  role: AdminRole;
   avatarUrl?: string;
 }
 
@@ -228,8 +228,8 @@ export interface Team {
   name: string;
   description: string;
   memberUserIds?: string[]; // Array of StaffRecord IDs
-  managerName?: string; // Name of the manager (denormalized for display)
   managerId?: string; // ID of the manager (StaffRecord ID or AdminUser ID)
+  managerName?: string; // Name of the manager (denormalized for display)
   memberCount: number;
   defaultTemplateId?: string;
   createdAt?: any;
@@ -247,3 +247,5 @@ export interface ContactInfo {
   submittedFromCardId?: string; // fingerprintUrl of the card it was submitted from
   submittedAt: string | any; // ISO string or Firestore Timestamp
 }
+
+    
