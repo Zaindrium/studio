@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import '../globals.css';
-import { Link as LinkIconLucide, LayoutDashboard, Users, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock, Briefcase } from 'lucide-react';
+import { Link as LinkIconLucide, LayoutDashboard, Users, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock } from 'lucide-react';
 import {
   Sidebar,
   SidebarProvider,
@@ -22,25 +22,24 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
-import type { AdminUser } from '@/lib/app-types';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { useAuth } from '@/contexts/auth-context';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton';
 
 const sidebarNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/teams', label: 'Teams', icon: Users, isPremium: true },
-  { href: '/dashboard/users', label: 'Staff', icon: UserCog }, // Renamed from 'Users'
-  { href: '/dashboard/templates', label: 'Templates', icon: FileText },
+  { href: '/dashboard/users', label: 'Staff', icon: UserCog },
+  { href: '/dashboard/templates', label: 'Templates', icon: FileText, isPremium: true },
   { href: '/dashboard/generator', label: 'Card Editor', icon: Blocks },
   { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true }, 
+  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true },
   { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true },
   { href: '/dashboard/license', label: 'License Management', icon: ShoppingCart },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings }, 
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
 ];
 
@@ -51,12 +50,12 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, loading: authLoading, companyId } = useAuth(); // Use auth context
+  const { currentUser, loading: authLoading, companyId } = useAuth();
   const { currentPlan, isLoading: isPlanLoading } = useCurrentPlan();
   const [activePlan, setActivePlan] = useState<PlanId | null>(null);
 
-  const adminUser = currentUser?.adminProfile; // Get AdminUser from context
-  const organizationName = adminUser?.companyName || (currentUser?.email ? 'Your Company' : 'Loading...');
+  const adminUser = currentUser?.adminProfile;
+  const organizationName = adminUser?.companyName || (currentUser?.email ? 'Your Company' : 'LinkUP');
 
   useEffect(() => {
     if (!isPlanLoading && currentPlan) {
@@ -70,25 +69,26 @@ export default function DashboardLayout({
       router.push('/login');
     } catch (error) {
       console.error("Logout failed:", error);
-      // Optionally show a toast error
     }
   };
+
+  useEffect(() => {
+    if (!authLoading && !currentUser && typeof window !== 'undefined') {
+      router.push('/login');
+    }
+  }, [authLoading, currentUser, router]);
 
   if (authLoading) {
     return (
       <div className="flex min-h-screen bg-background text-foreground items-center justify-center">
-        <p>Loading dashboard...</p> {/* Or a more sophisticated Skeleton loader for the whole layout */}
+        <p>Loading dashboard...</p>
       </div>
     );
   }
 
   if (!currentUser) {
-    // This should ideally be handled by a route guard or middleware,
-    // but as a fallback, redirect if no user is found after loading.
-    if (typeof window !== 'undefined') { // Ensure router.push is only called client-side
-        router.push('/login');
-    }
-    return ( // Render a loading/redirecting state
+    // This state will likely only be shown briefly before the useEffect above redirects.
+    return (
         <div className="flex min-h-screen bg-background text-foreground items-center justify-center">
             <p>Redirecting to login...</p>
         </div>
@@ -97,7 +97,6 @@ export default function DashboardLayout({
   
   const displayedAdminName = adminUser?.name || currentUser?.displayName || currentUser?.email || "Admin";
   const avatarFallback = displayedAdminName.charAt(0).toUpperCase();
-
 
   return (
     <SidebarProvider defaultOpen>
