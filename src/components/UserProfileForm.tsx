@@ -16,10 +16,10 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button'; // Added Button
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud } from 'lucide-react'; // Added UploadCloud
-import React, { useRef } from 'react'; // Added useRef
+import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2 } from 'lucide-react';
+import React, { useRef } from 'react';
 
 const profileSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -42,7 +42,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 interface UserProfileFormProps {
   profile: UserProfile;
-  onProfileChange: (data: Partial<UserProfile>) => void; // Changed to Partial<UserProfile>
+  onProfileChange: (data: Partial<UserProfile>) => void;
 }
 
 export function UserProfileForm({ profile, onProfileChange }: UserProfileFormProps) {
@@ -60,7 +60,7 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
 
   React.useEffect(() => {
     const subscription = form.watch((value) => {
-      onProfileChange(value as UserProfile);
+      onProfileChange(value as Partial<UserProfile>);
     });
     return () => subscription.unsubscribe();
   }, [form, onProfileChange]);
@@ -74,7 +74,6 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
       const reader = new FileReader();
       reader.onloadend = () => {
         form.setValue(fieldName, reader.result as string);
-        // onProfileChange({ [fieldName]: reader.result as string }); // This will be handled by the watch effect
       };
       reader.readAsDataURL(file);
     }
@@ -224,7 +223,7 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
             <FormField
               control={form.control}
               name="profilePictureUrl"
-              render={() => ( // field is not directly used here for the button case
+              render={() => (
                 <FormItem>
                   <FormLabel className="flex items-center"><ImageIcon className="mr-2 h-4 w-4" />Profile Picture</FormLabel>
                   <FormControl>
@@ -262,11 +261,11 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
              <FormField
               control={form.control}
               name="cardBackgroundUrl"
-              render={() => ( // field is not directly used here
+              render={() => (
                 <FormItem>
                   <FormLabel className="flex items-center"><ImagePlus className="mr-2 h-4 w-4" />Card Background Image</FormLabel>
                   <FormControl>
-                     <>
+                    <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                       <Input
                         type="file"
                         accept="image/*"
@@ -284,7 +283,18 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
                          <UploadCloud className="mr-2 h-4 w-4" />
                         Upload Background Image
                       </Button>
-                    </>
+                      {form.watch('cardBackgroundUrl') && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => form.setValue('cardBackgroundUrl', '')}
+                          className="w-full sm:w-auto"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Remove Background
+                        </Button>
+                      )}
+                    </div>
                   </FormControl>
                   <FormDescription>
                     {form.watch('cardBackgroundUrl') && typeof form.watch('cardBackgroundUrl') === 'string' && !form.watch('cardBackgroundUrl').startsWith('data:') ?
@@ -332,3 +342,5 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
     </Card>
   );
 }
+
+    
