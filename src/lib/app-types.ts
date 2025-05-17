@@ -39,53 +39,53 @@ export interface CompanyProfile {
   size?: string;
   website?: string;
   address?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: any; // Firestore Timestamp or string after fetch
+  updatedAt: any; // Firestore Timestamp or string after fetch
 }
 
 // Represents an Admin User in Firebase
-export type AdminRole = 'Owner' | 'Admin' | 'BillingManager'; // Example roles for system admins
+export type AdminRole = 'Owner' | 'Admin' | 'BillingManager'; 
 export type UserStatus = 'Active' | 'Invited' | 'Inactive';
 
 export interface AdminUser { 
-  id: string; // adminId
+  id: string; // adminId (usually user.uid)
   companyId: string;
+  companyName?: string; // For convenience, can be denormalized or fetched
   name: string;
   email: string;
   emailVerified?: boolean;
   role: AdminRole; 
   status: UserStatus;
   profilePictureUrl?: string;
-  lastLoginAt?: string;
-  createdAt: string;
-  updatedAt?: string;
+  lastLoginAt?: string | any; // string representation or Firestore Timestamp
+  createdAt: string | any;    // string representation or Firestore Timestamp
+  updatedAt?: string | any;   // string representation or Firestore Timestamp
 }
 
 // Represents a Staff Record in Firebase (managed by Admins, no login)
-// This is also used for the "Users" list in the dashboard.
-export type StaffRole = 'Employee' | 'Manager' | 'Contractor' // Roles within the company for staff
+export type StaffRole = 'Employee' | 'Manager' | 'Contractor' 
 export interface StaffRecord {
   id: string; 
-  companyId?: string; // Optional if not strictly needed for mock display
+  // companyId is implicit from the path: companies/{companyId}/staff/{staffId}
   name: string;
   email: string; 
-  role: StaffRole; // Role of the staff member in the company
-  teamId?: string; // Team they belong to
-  status: UserStatus; // 'Active', 'Invited', 'Inactive' status of their card/profile
-  fingerprintUrl: string; // e.g., 'john-doe-unique-card-id' (should be URL safe)
+  role: StaffRole; 
+  teamId?: string; 
+  status: UserStatus; 
+  fingerprintUrl: string; 
   uniqueNfcIdentifier?: string; 
   assignedCardId?: string; 
-  cardsCreatedCount?: number; // For dashboard display, actual count on their assigned card
-  lastLoginAt?: string; // This might not be relevant if staff don't log in. Keep for consistency or remove.
-  createdAt: string;
-  updatedAt?: string;
+  cardsCreatedCount?: number; 
+  lastLoginAt?: string | any; // This might not be relevant if staff don't log in.
+  createdAt: string | any;
+  updatedAt?: string | any;
 }
 
 
 // Represents a Digital Business Card record in Firebase
 export interface DigitalBusinessCardRecord {
   id: string; // cardId
-  companyId: string;
+  // companyId is implicit
   staffRecordId: string; 
   templateId?: string; 
   customFields?: Record<string, any>; 
@@ -93,21 +93,21 @@ export interface DigitalBusinessCardRecord {
   designSettings: CardDesignSettings; 
   isActive: boolean; 
   nfcTagId?: string; 
-  createdAt: string;
-  updatedAt: string;
+  createdAt: any;
+  updatedAt: any;
 }
 
 // Represents a Card Template record in Firebase
 export interface CardTemplateRecord {
   id: string; // templateId
-  companyId: string;
+  // companyId is implicit
   name: string;
   description?: string;
   designSettings: CardDesignSettings; 
   defaultFields?: Partial<StaffCardData>; 
   isDefault?: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: any;
+  updatedAt: any;
 }
 
 
@@ -117,7 +117,7 @@ export interface AccessCode {
     companyId: string;
     isUsed: boolean;
     expiresAt?: string;
-    createdAt: string;
+    createdAt: any;
 }
 
 // AppTemplate is used to initialize the card editor (now in Generator tab)
@@ -209,10 +209,10 @@ export const defaultCardDesignSettings: CardDesignSettings = defaultClassicDesig
 
 
 // For Dashboard User/Admin list display
-// This specific `AuthenticatedUser` type is for the LOGGED-IN ADMIN USER's info,
+// This specific `AuthenticatedAdminInfo` type is for the LOGGED-IN ADMIN USER's info,
 // not for the list of staff they manage. For staff, use `StaffRecord`.
 export interface AuthenticatedAdminInfo { 
-  id: string;
+  id: string; // adminId / uid
   companyId: string; 
   organizationName: string; 
   name: string;
@@ -224,15 +224,16 @@ export interface AuthenticatedAdminInfo {
 // For Dashboard Teams list
 export interface Team {
   id: string;
-  organizationId?: string;
+  // organizationId is implicit from path: companies/{companyId}/teams/{teamId}
   name: string;
   description: string;
-  memberUserIds?: string[];
-  manager: string; 
+  memberUserIds?: string[]; // Array of StaffRecord IDs
+  managerName?: string; // Name of the manager (denormalized for display)
+  managerId?: string; // ID of the manager (StaffRecord ID or AdminUser ID)
   memberCount: number;
   defaultTemplateId?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 // For Contact Collection on Public Card
@@ -243,6 +244,6 @@ export interface ContactInfo {
   phone?: string;
   company?: string;
   message?: string;
-  submittedFromCardId?: string;
-  submittedAt: string;
+  submittedFromCardId?: string; // fingerprintUrl of the card it was submitted from
+  submittedAt: string | any; // ISO string or Firestore Timestamp
 }

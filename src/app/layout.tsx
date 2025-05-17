@@ -1,10 +1,11 @@
 
-"use client"; // Required for useState and useEffect
+"use client"; 
 
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { SplashScreen } from '@/components/SplashScreen';
+// Removed SplashScreen import as it's no longer used here
+import { AuthProvider } from '@/contexts/auth-context'; // Import AuthProvider
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -21,6 +22,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Splash screen logic is removed as per previous requirements
+  // The AuthProvider will now wrap the children
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       <head>
@@ -29,8 +33,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body>
-        {children}
-        <Toaster />
+        <AuthProvider> {/* Wrap children with AuthProvider */}
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );

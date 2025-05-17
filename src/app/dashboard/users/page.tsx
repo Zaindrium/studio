@@ -33,7 +33,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, Link as LinkIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import type { StaffRecord, StaffRole, UserStatus, Team, AdminUser } from '@/lib/app-types';
+import type { StaffRecord, StaffRole, UserStatus, Team } from '@/lib/app-types';
 import Link from 'next/link';
 import { sanitizeForUrl } from '@/lib/utils';
 import {
@@ -54,11 +54,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { db } from '@/lib/firebase'; // Import Firestore instance
+import { db } from '@/lib/firebase'; 
 import { 
   collection, 
   query, 
-  // where, // Not used currently, but keep for potential future filtering
   getDocs, 
   addDoc, 
   doc, 
@@ -68,19 +67,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Simulated admin user data - replace with actual auth context later
-const MOCK_ADMIN_USER: AdminUser & { organizationName: string } = {
-  id: "admin-user-123",
-  companyId: "company-abc-789", 
-  organizationName: "LinkUP Corp", 
-  name: "Admin LoggedIn",
-  email: "admin@examplecorp.com",
-  role: 'Owner', 
-  status: 'Active',
-  createdAt: new Date().toISOString(),
-};
-
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 
 const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team1', name: 'Sales Team Alpha' },
@@ -92,7 +79,7 @@ const generateUniqueFingerprint = () => {
   return sanitizeForUrl(`staff-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`);
 };
 
-const initialNewStaffState: Partial<StaffRecord> & { teamId?: string } = { // teamId is optional
+const initialNewStaffState: Partial<StaffRecord> & { teamId?: string } = {
     name: '',
     email: '',
     role: 'Employee',
@@ -103,8 +90,9 @@ const initialNewStaffState: Partial<StaffRecord> & { teamId?: string } = { // te
 
 
 export default function UsersPage() {
+  const { currentUser, loading: authLoading, companyId } = useAuth(); // Use auth context
   const [staffList, setStaffList] = useState<StaffRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -114,27 +102,29 @@ export default function UsersPage() {
   const [isDeleteStaffAlertOpen, setIsDeleteStaffAlertOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffRecord | null>(null);
 
-  const adminUser = MOCK_ADMIN_USER;
-
   const fetchStaff = useCallback(async () => {
-    if (!adminUser.companyId) {
-      toast({ title: "Error", description: "Company ID not found for admin.", variant: "destructive" });
-      setIsLoading(false);
+    if (!companyId) {
+      // companyId might not be available immediately if auth is still loading
+      if (!authLoading) { // Only toast if auth is done loading and companyId is still missing
+        toast({ title: "Error", description: "Company ID not found for admin. Cannot fetch staff.", variant: "destructive" });
+      }
+      setIsLoadingData(false);
+      setStaffList([]); // Clear list if no companyId
       return;
     }
-    setIsLoading(true);
+    setIsLoadingData(true);
     try {
-      const staffCollectionRef = collection(db, `companies/${adminUser.companyId}/staff`);
+      const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
       const q = query(staffCollectionRef); 
       const querySnapshot = await getDocs(q);
       const fetchedStaff: StaffRecord[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      querySnapshot.forEach((docSnap) => { // Renamed doc to docSnap to avoid conflict
+        const data = docSnap.data();
         fetchedStaff.push({ 
-          id: doc.id, 
+          id: docSnap.id, 
           ...data,
-          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date()).toISOString(),
-          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date()).toISOString(),
+          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
+          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
           lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt || '-',
         } as StaffRecord);
       });
@@ -143,13 +133,19 @@ export default function UsersPage() {
       console.error("Error fetching staff:", error);
       toast({ title: "Error", description: "Could not fetch staff list.", variant: "destructive" });
     } finally {
-      setIsLoading(false);
+      setIsLoadingData(false);
     }
-  }, [adminUser.companyId, toast]);
+  }, [companyId, toast, authLoading]);
 
   useEffect(() => {
-    fetchStaff();
-  }, [fetchStaff]);
+    if (!authLoading && companyId) { // Fetch staff only when auth is resolved and companyId is available
+      fetchStaff();
+    } else if (!authLoading && !companyId) {
+      // Handle case where auth is loaded but no companyId (e.g. new user flow incomplete)
+      setStaffList([]);
+      setIsLoadingData(false);
+    }
+  }, [fetchStaff, authLoading, companyId]);
 
   const filteredStaffList = useMemo(() => {
     return staffList.filter(staff =>
@@ -186,39 +182,37 @@ export default function UsersPage() {
       toast({ title: "Missing Information", description: "Name and Email are required.", variant: "destructive" });
       return;
     }
-    if (!adminUser.companyId) {
+    if (!companyId) {
       toast({ title: "Error", description: "Company ID not found for admin.", variant: "destructive" });
       return;
     }
 
     let finalFingerprintUrl = newStaffForm.fingerprintUrl?.trim() || '';
-    if (!editingStaff) { // Only generate/sanitize if it's a new staff or if the field was empty
+    if (!editingStaff) { 
       if (!finalFingerprintUrl) {
         finalFingerprintUrl = generateUniqueFingerprint();
       } else {
         finalFingerprintUrl = sanitizeForUrl(finalFingerprintUrl);
       }
     }
-    // If editing, fingerprintUrl comes from existingStaff.fingerprintUrl and is not changed here.
-
-    const staffDataToSave: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount'> & { teamId?: string, updatedAt?: Timestamp, createdAt?: Timestamp, fingerprintUrl: string } = {
+    
+    const staffDataToSave = {
       name: newStaffForm.name,
       email: newStaffForm.email,
       role: newStaffForm.role || 'Employee',
       teamId: newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId,
       status: editingStaff ? newStaffForm.status || editingStaff.status : 'Invited',
-      fingerprintUrl: editingStaff ? editingStaff.fingerprintUrl : finalFingerprintUrl, // Use existing if editing
+      fingerprintUrl: editingStaff ? editingStaff.fingerprintUrl : finalFingerprintUrl, 
     };
 
     try {
       if (editingStaff) {
-        const staffDocRef = doc(db, `companies/${adminUser.companyId}/staff`, editingStaff.id);
-        // Do not update fingerprintUrl when editing
-        const { fingerprintUrl: _fpu, ...dataToUpdate } = staffDataToSave;
+        const staffDocRef = doc(db, `companies/${companyId}/staff`, editingStaff.id);
+        const { fingerprintUrl: _fpu, ...dataToUpdate } = staffDataToSave; // Exclude fingerprintUrl from update
         await updateDoc(staffDocRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
         toast({ title: "Staff Updated", description: `${newStaffForm.name} has been updated.` });
       } else {
-        const staffCollectionRef = collection(db, `companies/${adminUser.companyId}/staff`);
+        const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
         await addDoc(staffCollectionRef, { 
           ...staffDataToSave, 
           cardsCreatedCount: 0,
@@ -242,9 +236,9 @@ export default function UsersPage() {
   };
   
   const handleDeleteStaff = async () => {
-    if (!staffToDelete || !adminUser.companyId) return;
+    if (!staffToDelete || !companyId) return;
     try {
-      const staffDocRef = doc(db, `companies/${adminUser.companyId}/staff`, staffToDelete.id);
+      const staffDocRef = doc(db, `companies/${companyId}/staff`, staffToDelete.id);
       await deleteDoc(staffDocRef);
       toast({ title: "Staff Deleted", description: `${staffToDelete.name} has been removed.` });
       fetchStaff(); 
@@ -271,7 +265,7 @@ export default function UsersPage() {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || isLoadingData) {
     return (
       <Card>
         <CardHeader>
@@ -297,7 +291,7 @@ export default function UsersPage() {
                 <CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary"/>Staff Management</CardTitle>
                 <CardDescription>Manage staff members in your organization. Assign roles, teams, and manage their digital card access.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenAddStaffDialog()}>
+            <Button onClick={() => handleOpenAddStaffDialog()} disabled={!companyId}>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Staff
             </Button>
         </div>
@@ -478,7 +472,7 @@ export default function UsersPage() {
                   value={newStaffForm.fingerprintUrl || ''}
                   onChange={(e) => handleFormChange('fingerprintUrl', sanitizeForUrl(e.target.value))}
                   placeholder="e.g., alex-johnson (auto-generated if blank)"
-                  disabled={!!editingStaff} // Non-editable after creation
+                  disabled={!!editingStaff} 
                 />
                 <p className="text-xs text-muted-foreground">
                   Unique part of the card URL. {editingStaff ? "Cannot be changed after creation." : "Auto-generated if blank. Will be sanitized."} e.g., /card/{newStaffForm.fingerprintUrl || 'preview'}
@@ -514,5 +508,3 @@ export default function UsersPage() {
     </Card>
   );
 }
-
-    
