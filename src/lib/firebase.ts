@@ -15,6 +15,19 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional
 };
 
+// Validate that essential Firebase config values are present
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error(
+    "Firebase configuration error: API Key or Project ID is missing.\n" +
+    "Please ensure your .env file is correctly set up with all NEXT_PUBLIC_FIREBASE_ variables.\n" +
+    "You need to replace placeholder values with your actual Firebase project credentials.\n" +
+    "After updating .env, restart your Next.js development server."
+  );
+  // Optionally, throw an error to stop initialization if critical config is missing,
+  // though Firebase SDK will likely throw its own error first.
+  // throw new Error("Critical Firebase configuration (API Key or Project ID) is missing. Check .env file and restart server.");
+}
+
 // Initialize Firebase
 let app;
 if (!getApps().length) {
