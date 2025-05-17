@@ -16,13 +16,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from '@/components/ui/input';
 import { Palette, LayoutGrid, Nfc, Settings2, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import React, { memo } from 'react'; // Added memo
 
 interface CardDesignerProps {
   design: CardDesignSettings;
   onDesignChange: (newDesign: CardDesignSettings) => void;
 }
 
-export function CardDesigner({ design, onDesignChange }: CardDesignerProps) {
+const CardDesignerComponent = ({ design, onDesignChange }: CardDesignerProps) => {
   const { toast } = useToast();
 
   const handleTemplateChange = (value: string) => {
@@ -49,7 +50,7 @@ export function CardDesigner({ design, onDesignChange }: CardDesignerProps) {
       toast({
         title: "NFC Ready!",
         description: "Enable NFC on your phone and tap it to your tag to write your card URL.",
-        duration: 7000, // Give more time for user to react
+        duration: 7000, 
       });
       // Actual WebNFC write logic would go here:
       // const ndef = new (window as any).NDEFReader();
@@ -172,3 +173,5 @@ export function CardDesigner({ design, onDesignChange }: CardDesignerProps) {
     </Card>
   );
 }
+
+export const CardDesigner = memo(CardDesignerComponent);

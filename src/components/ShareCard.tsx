@@ -4,12 +4,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Share2 } from 'lucide-react';
 import { ShareOptions } from './ShareOptions';
+import React, { memo } from 'react'; // Added memo
 
 interface ShareCardProps {
   cardUrl: string;
 }
 
-export function ShareCard({ cardUrl }: ShareCardProps) {
+const ShareCardComponent = ({ cardUrl }: ShareCardProps) => {
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -21,3 +22,5 @@ export function ShareCard({ cardUrl }: ShareCardProps) {
     </Card>
   );
 }
+
+export const ShareCard = memo(ShareCardComponent);

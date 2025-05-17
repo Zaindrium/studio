@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react'; // Added memo
 import type { UserProfile, CardDesignSettings } from '@/lib/types';
 import { proposeCardEnhancements, ProposeCardEnhancementsInput, ProposeCardEnhancementsOutput } from '@/ai/flows/propose-card-enhancements';
 import { generateCardBackground, GenerateCardBackgroundInput, GenerateCardBackgroundOutput } from '@/ai/flows/generate-card-background-flow';
@@ -16,10 +16,10 @@ interface AiDesignAssistantProps {
   userProfile: UserProfile;
   currentDesign: CardDesignSettings;
   onApplySuggestions: (updatedDesign: Partial<CardDesignSettings>) => void;
-  onUpdateProfileForAI: (aiRelatedProfileData: Partial<UserProfile>) => void; // Modified to accept Partial<UserProfile>
+  onUpdateProfileForAI: (aiRelatedProfileData: Partial<UserProfile>) => void;
 }
 
-export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestions, onUpdateProfileForAI }: AiDesignAssistantProps) {
+const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggestions, onUpdateProfileForAI }: AiDesignAssistantProps) => {
   const [suggestions, setSuggestions] = useState<ProposeCardEnhancementsOutput | null>(null);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [isGeneratingBackground, setIsGeneratingBackground] = useState(false);
@@ -149,8 +149,16 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
           <AlertTitle>How it works</AlertTitle>
           <AlertDescription>
             The AI uses your entire profile (including links for context if possible) to generate holistic suggestions. Ensure your profile details are up-to-date! LinkedIn profile pictures cannot be fetched automatically; please upload yours manually.
+            Your "About Me" (Profession, Interests) and "Target Audience" fields below greatly help the AI.
           </AlertDescription>
         </Alert>
+        
+        <div className="p-3 border rounded-md bg-secondary/20 space-y-2">
+            <Label className="font-medium text-sm">Current Info for AI:</Label>
+            <p className="text-xs"><strong>Your Info:</strong> {userProfile.userInfo || <span className="italic text-muted-foreground">Not set in profile</span>}</p>
+            <p className="text-xs"><strong>Target Audience:</strong> {userProfile.targetAudience || <span className="italic text-muted-foreground">Not set in profile</span>}</p>
+        </div>
+
 
         <Button onClick={handleSuggestEnhancements} disabled={isLoadingSuggestions || isGeneratingBackground} className="w-full">
           <Wand2 className="mr-2 h-5 w-5" />
@@ -232,3 +240,5 @@ export function AiDesignAssistant({ userProfile, currentDesign, onApplySuggestio
     </Card>
   );
 }
+
+export const AiDesignAssistant = memo(AiDesignAssistantComponent);

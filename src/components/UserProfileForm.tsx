@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2 } from 'lucide-react';
-import React, { useRef } from 'react';
+import React, { useRef, memo } from 'react'; // Added memo
 
 const profileSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -32,8 +32,8 @@ const profileSchema = z.object({
   twitter: z.string().optional(),
   github: z.string().optional(),
   address: z.string().optional(),
-  profilePictureUrl: z.string().optional().or(z.literal('')), // Accepts URL or dataURI
-  cardBackgroundUrl: z.string().optional().or(z.literal('')), // Accepts URL or dataURI
+  profilePictureUrl: z.string().optional().or(z.literal('')), 
+  cardBackgroundUrl: z.string().optional().or(z.literal('')), 
   userInfo: z.string().optional().describe('Information about the user, including their profession and interests for AI assistant.'),
   targetAudience: z.string().optional().describe('The target audience for the business card for AI assistant.'),
 });
@@ -45,7 +45,10 @@ interface UserProfileFormProps {
   onProfileChange: (data: Partial<UserProfile>) => void;
 }
 
-export function UserProfileForm({ profile, onProfileChange }: UserProfileFormProps) {
+// Form component is memoized using React.memo to prevent unnecessary re-renders
+// if its props (profile, onProfileChange) do not change shallowly.
+// The onProfileChange callback should ideally be memoized using useCallback in the parent component.
+const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormProps) => {
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: profile,
@@ -54,10 +57,13 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const cardBackgroundInputRef = useRef<HTMLInputElement>(null);
 
+  // Effect to reset the form if the profile prop changes from outside
   React.useEffect(() => {
     form.reset(profile);
   }, [profile, form]);
 
+  // Effect to subscribe to form value changes and call onProfileChange.
+  // This makes the form "inline editable" - changes are propagated upwards as they happen.
   React.useEffect(() => {
     const subscription = form.watch((value) => {
       onProfileChange(value as Partial<UserProfile>);
@@ -291,7 +297,7 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
                           className="w-full sm:w-auto"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Remove Background
+                          Remove Background Image
                         </Button>
                       )}
                     </div>
@@ -343,4 +349,5 @@ export function UserProfileForm({ profile, onProfileChange }: UserProfileFormPro
   );
 }
 
+export const UserProfileForm = memo(UserProfileFormComponent);
     

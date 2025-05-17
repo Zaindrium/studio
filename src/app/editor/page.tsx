@@ -20,7 +20,7 @@ import { sanitizeForUrl } from '@/lib/utils';
 const initialTemplate = appTemplates[0]; 
 const ONBOARDING_STORAGE_KEY = 'linkup_onboarding_completed';
 
-export default function EditorPage() { // Changed component name to EditorPage
+export default function EditorPage() { 
   const [userProfile, setUserProfile] = useState<UserProfile>(initialTemplate.profile);
   const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
   const [isClient, setIsClient] = useState(false);

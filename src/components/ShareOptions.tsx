@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react'; // Added memo
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -11,7 +11,7 @@ interface ShareOptionsProps {
   cardUrl: string;
 }
 
-export function ShareOptions({ cardUrl }: ShareOptionsProps) {
+const ShareOptionsComponent = ({ cardUrl }: ShareOptionsProps) => {
   const { toast } = useToast();
   const [isWebShareSupported, setIsWebShareSupported] = useState(false);
 
@@ -74,9 +74,7 @@ export function ShareOptions({ cardUrl }: ShareOptionsProps) {
           description: 'Your card has been shared.',
         });
       } catch (error) {
-        // Check if the error is due to user aborting the share
         if (error instanceof DOMException && error.name === 'AbortError') {
-          // User cancelled the share, no toast needed or a very subtle one
           console.log('Share cancelled by user.');
         } else {
           console.error('Error sharing natively:', error);
@@ -126,3 +124,5 @@ export function ShareOptions({ cardUrl }: ShareOptionsProps) {
     </div>
   );
 }
+
+export const ShareOptions = memo(ShareOptionsComponent);
