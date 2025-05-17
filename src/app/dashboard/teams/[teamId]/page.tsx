@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation'; // Added useRouter
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Users, UserPlus, FileText, Edit, ArrowLeft, Settings, Trash2, BarChart3, UserMinus } from 'lucide-react';
@@ -17,7 +17,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -28,241 +27,228 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input'; // Keep this for potential future use
+import { Label } from '@/components/ui/label'; // Keep this for potential future use
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-
-// Interfaces for mock data structures
-interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  cardsCreatedCount: number; 
-  averageSharesPerCard: number; 
-}
-
-interface AssignedTemplate {
-  id: string;
-  name: string;
-}
-
-interface TeamMetrics {
-  cardsCreated: number;
-  averageSharesPerCard: number;
-  leadsGenerated: number;
-  activeMembers: number;
-}
-
-interface DetailedTeam {
-  id: string;
-  name: string;
-  description: string;
-  manager: string;
-  members: TeamMember[];
-  assignedTemplates: AssignedTemplate[];
-  teamMetrics: TeamMetrics;
-}
-
-interface OrganizationUser {
-  id: string;
-  name: string;
-  email: string;
-}
+import type { TeamMember, AssignedTemplate, TeamMetrics, DetailedTeam, StaffRecord, OrganizationUser } from '@/lib/app-types'; // Make sure OrganizationUser is exported
+import { db } from '@/lib/firebase';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, deleteDoc, Timestamp } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
-const MOCK_DETAILED_TEAMS_DATA: DetailedTeam[] = [
-  {
-    id: 'team1',
-    name: 'Sales Team Alpha',
-    description: 'Focused on enterprise client acquisition and regional sales targets.',
-    manager: 'Alice Smith',
-    members: [
-      { id: 'user1', name: 'John Doe', role: 'Sales Rep', email: 'john.doe@example.com', cardsCreatedCount: 10, averageSharesPerCard: 15 },
-      { id: 'user2', name: 'Jane Roe', role: 'Sales Lead', email: 'jane.roe@example.com', cardsCreatedCount: 8, averageSharesPerCard: 20 },
-      { id: 'user3', name: 'Mike Chan', role: 'Account Manager', email: 'mike.chan@example.com', cardsCreatedCount: 12, averageSharesPerCard: 10 },
-    ],
-    assignedTemplates: [
-      { id: 'templateA', name: 'Enterprise Sales Card' },
-      { id: 'templateB', name: 'Networking Event Card (Sales)' },
-    ],
-    teamMetrics: { 
-      cardsCreated: 0,
-      averageSharesPerCard: 0,
-      leadsGenerated: 150, 
-      activeMembers: 0,
-    }
-  },
-  {
-    id: 'team2',
-    name: 'Marketing Crew Gamma',
-    description: 'Digital marketing, content creation, and brand management.',
-    manager: 'Bob Johnson',
-    members: [
-      { id: 'user4', name: 'Sarah Lee', role: 'Content Strategist', email: 'sarah.lee@example.com', cardsCreatedCount: 5, averageSharesPerCard: 25 },
-      { id: 'user5', name: 'Tom Wilson', role: 'SEO Specialist', email: 'tom.wilson@example.com', cardsCreatedCount: 7, averageSharesPerCard: 18 },
-    ],
-    assignedTemplates: [
-      { id: 'templateC', name: 'Brand Awareness Card' },
-    ],
-    teamMetrics: {
-      cardsCreated: 0,
-      averageSharesPerCard: 0,
-      leadsGenerated: 95, 
-      activeMembers: 0,
-    }
-  },
-  {
-    id: 'team3',
-    name: 'Engineering Squad Beta',
-    description: 'Product development and R&D for core platform features.',
-    manager: 'Carol White',
-    members: [
-      { id: 'user6', name: 'David Kim', role: 'Backend Developer', email: 'david.kim@example.com', cardsCreatedCount: 2, averageSharesPerCard: 3 },
-      { id: 'user7', name: 'Laura Chen', role: 'Frontend Developer', email: 'laura.chen@example.com', cardsCreatedCount: 3, averageSharesPerCard: 6 },
-      { id: 'user8', name: 'Kevin Green', role: 'QA Engineer', email: 'kevin.green@example.com', cardsCreatedCount: 1, averageSharesPerCard: 2 },
-    ],
-    assignedTemplates: [
-      { id: 'templateD', name: 'Developer Profile Card' },
-    ],
-    teamMetrics: {
-      cardsCreated: 0,
-      averageSharesPerCard: 0,
-      leadsGenerated: 10, 
-      activeMembers: 0,
-    }
-  }
-];
-
-const MOCK_ORGANIZATION_USERS: OrganizationUser[] = [
-    { id: 'user1', name: 'John Doe', email: 'john.doe@example.com' },
-    { id: 'user2', name: 'Jane Roe', email: 'jane.roe@example.com' },
-    { id: 'user3', name: 'Mike Chan', email: 'mike.chan@example.com' },
-    { id: 'user4', name: 'Sarah Lee', email: 'sarah.lee@example.com' },
-    { id: 'user5', name: 'Tom Wilson', email: 'tom.wilson@example.com' },
-    { id: 'user6', name: 'David Kim', email: 'david.kim@example.com' },
-    { id: 'user7', name: 'Laura Chen', email: 'laura.chen@example.com' },
-    { id: 'user8', name: 'Kevin Green', email: 'kevin.green@example.com' },
-    { id: 'user9', name: 'Olivia Brown', email: 'olivia.brown@example.com' },
-    { id: 'user10', name: 'Chris Davis', email: 'chris.davis@example.com' },
-    { id: 'user11', name: 'Patricia Miller', email: 'patricia.miller@example.com' },
-    { id: 'user12', name: 'James Wilson', email: 'james.wilson@example.com' },
-];
-
+// MOCK_ORGANIZATION_USERS will be replaced by fetching
+// MOCK_DETAILED_TEAMS_DATA will be replaced by fetching
 
 export default function TeamDetailPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = params.teamId as string;
   const { toast } = useToast();
+  const { companyId, loading: authLoading } = useAuth();
 
   const [currentTeam, setCurrentTeam] = useState<DetailedTeam | null>(null);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(true);
   const [isManageMembersDialogOpen, setIsManageMembersDialogOpen] = useState(false);
+  const [organizationStaff, setOrganizationStaff] = useState<StaffRecord[]>([]);
+  const [isLoadingOrgStaff, setIsLoadingOrgStaff] = useState(false);
   
   const calculateTeamMetrics = (team: DetailedTeam | null): TeamMetrics => {
     if (!team || !team.members || team.members.length === 0) {
       return {
         cardsCreated: 0,
         averageSharesPerCard: 0,
-        leadsGenerated: team?.teamMetrics.leadsGenerated || 0,
+        leadsGenerated: team?.teamMetrics?.leadsGenerated || 0, // Use existing if available
         activeMembers: 0,
       };
     }
-
     const totalCardsCreated = team.members.reduce((sum, member) => sum + (member.cardsCreatedCount || 0), 0);
-    
-    let totalSumOfAverageShares = 0;
-    team.members.forEach(member => {
-      totalSumOfAverageShares += (member.averageSharesPerCard || 0);
-    });
+    const totalSumOfAverageShares = team.members.reduce((sum, member) => sum + (member.averageSharesPerCard || 0), 0);
     const overallAverageShares = team.members.length > 0 ? totalSumOfAverageShares / team.members.length : 0;
 
     return {
       cardsCreated: totalCardsCreated,
       averageSharesPerCard: parseFloat(overallAverageShares.toFixed(1)),
-      leadsGenerated: team.teamMetrics.leadsGenerated, 
+      leadsGenerated: team.teamMetrics?.leadsGenerated || 0, // Use existing
       activeMembers: team.members.length,
     };
   };
 
-  useEffect(() => {
-    const foundTeam = MOCK_DETAILED_TEAMS_DATA.find(t => t.id === teamId);
-    if (foundTeam) {
-      const initialTeamData = JSON.parse(JSON.stringify(foundTeam)); // Deep copy
-      initialTeamData.teamMetrics = calculateTeamMetrics(initialTeamData);
-      setCurrentTeam(initialTeamData);
-    } else {
-      setCurrentTeam(null);
+  const fetchTeamDetails = useCallback(async () => {
+    if (!companyId || !teamId) {
+        if(!authLoading) toast({ title: "Error", description: "Company or Team ID missing.", variant: "destructive" });
+        setIsLoadingTeam(false);
+        return;
     }
-  }, [teamId]);
+    setIsLoadingTeam(true);
+    try {
+      const teamDocRef = doc(db, `companies/${companyId}/teams`, teamId);
+      const teamDocSnap = await getDoc(teamDocRef);
 
-  const handleDeleteTeam = () => {
-    console.log(`Attempting to delete team ${currentTeam?.id}`);
-    toast({
-      title: "Team Deletion Initiated",
-      description: `Team "${currentTeam?.name}" would be deleted. (This is a simulation)`,
-      variant: "destructive",
-    });
-    router.push('/dashboard/teams');
-  };
+      if (teamDocSnap.exists()) {
+        const teamData = teamDocSnap.data() as Omit<DetailedTeam, 'id' | 'members' | 'teamMetrics'>;
+        
+        // Fetch members - assuming memberUserIds stores staff IDs
+        let members: TeamMember[] = [];
+        if (teamData.memberUserIds && teamData.memberUserIds.length > 0) {
+          const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
+          // Firestore 'in' query limit is 30. For more, fetch in batches or restructure.
+          const membersQuery = query(staffCollectionRef, where('__name__', 'in', teamData.memberUserIds.slice(0,30)));
+          const membersSnap = await getDocs(membersQuery);
+          members = membersSnap.docs.map(docSnap => {
+            const staffData = docSnap.data() as StaffRecord;
+            return {
+              id: docSnap.id,
+              name: staffData.name,
+              role: staffData.role, // Or a team-specific role if you have that
+              email: staffData.email,
+              cardsCreatedCount: staffData.cardsCreatedCount || 0,
+              averageSharesPerCard: 0, // This would need more complex aggregation
+            };
+          });
+        }
 
-  const handleRemoveMember = (memberId: string) => {
-    if (!currentTeam) return;
-    const memberToRemove = currentTeam.members.find(m => m.id === memberId);
-    setCurrentTeam(prevTeam => {
-      if (!prevTeam) return null;
-      const updatedTeam = {
-        ...prevTeam,
-        members: prevTeam.members.filter(m => m.id !== memberId),
-      };
-      updatedTeam.teamMetrics = calculateTeamMetrics(updatedTeam);
-      return updatedTeam;
-    });
-    toast({
-      title: "Member Removed",
-      description: `${memberToRemove?.name || 'Member'} has been removed. Team metrics updated. (Simulation)`,
-    });
-  };
-
-  const handleAddMember = (userId: string) => {
-    if (!currentTeam) return;
-    const userToAdd = MOCK_ORGANIZATION_USERS.find(u => u.id === userId);
-    if (userToAdd && !currentTeam.members.find(m => m.id === userId)) {
-      const newMember: TeamMember = {
-        id: userToAdd.id,
-        name: userToAdd.name,
-        email: userToAdd.email,
-        role: 'Member', // Default role
-        cardsCreatedCount: 0, // Default for new member
-        averageSharesPerCard: 0, // Default for new member
-      };
-      setCurrentTeam(prevTeam => {
-        if (!prevTeam) return null;
-        const updatedTeam = {
-          ...prevTeam,
-          members: [...prevTeam.members, newMember],
+        const fullTeamData: DetailedTeam = {
+          id: teamDocSnap.id,
+          ...teamData,
+          members,
+          // assignedTemplates and teamMetrics might be subcollections or fetched differently
+          assignedTemplates: teamData.assignedTemplates || [], // Keep mock or fetch
+          teamMetrics: { leadsGenerated: 0, ...teamData.teamMetrics }, // Initialize with default if not present
         };
-        updatedTeam.teamMetrics = calculateTeamMetrics(updatedTeam);
-        return updatedTeam;
+        fullTeamData.teamMetrics = calculateTeamMetrics(fullTeamData);
+        setCurrentTeam(fullTeamData);
+
+      } else {
+        toast({ title: "Error", description: "Team not found.", variant: "destructive" });
+        setCurrentTeam(null);
+        router.push('/dashboard/teams');
+      }
+    } catch (error) {
+      console.error("Error fetching team details:", error);
+      toast({ title: "Error", description: "Could not fetch team details.", variant: "destructive" });
+    } finally {
+      setIsLoadingTeam(false);
+    }
+  }, [companyId, teamId, toast, router, authLoading]);
+
+  const fetchOrganizationStaff = useCallback(async () => {
+    if (!companyId) return;
+    setIsLoadingOrgStaff(true);
+    try {
+      const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
+      const q = query(staffCollectionRef);
+      const querySnapshot = await getDocs(q);
+      const fetchedStaff: StaffRecord[] = [];
+      querySnapshot.forEach((docSnap) => {
+        fetchedStaff.push({ id: docSnap.id, ...docSnap.data() } as StaffRecord);
       });
+      setOrganizationStaff(fetchedStaff);
+    } catch (error) {
+      console.error("Error fetching organization staff:", error);
+    } finally {
+      setIsLoadingOrgStaff(false);
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!authLoading && companyId) {
+      fetchTeamDetails();
+      fetchOrganizationStaff();
+    }
+  }, [authLoading, companyId, fetchTeamDetails, fetchOrganizationStaff]);
+
+
+  const handleDeleteTeam = async () => {
+    if (!currentTeam || !companyId) return;
+    try {
+      const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
+      await deleteDoc(teamDocRef);
       toast({
-        title: "Member Added",
-        description: `${userToAdd.name} has been added to the team. Team metrics updated. (Simulation)`,
+        title: "Team Deleted",
+        description: `Team "${currentTeam.name}" has been deleted.`,
+        variant: "default",
       });
+      router.push('/dashboard/teams');
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      toast({ title: "Error", description: "Could not delete team.", variant: "destructive" });
     }
   };
 
-  const availableUsersToAdd = MOCK_ORGANIZATION_USERS.filter(
+  const handleRemoveMember = async (memberId: string) => {
+    if (!currentTeam || !companyId) return;
+    const memberToRemove = currentTeam.members.find(m => m.id === memberId);
+    try {
+      const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
+      await updateDoc(teamDocRef, {
+        memberUserIds: arrayRemove(memberId)
+      });
+      // Re-fetch team details to update member list and metrics
+      fetchTeamDetails(); 
+      toast({
+        title: "Member Removed",
+        description: `${memberToRemove?.name || 'Member'} has been removed from the team.`,
+      });
+    } catch (error) {
+      console.error("Error removing member:", error);
+      toast({ title: "Error", description: "Could not remove member.", variant: "destructive" });
+    }
+  };
+
+  const handleAddMember = async (staffId: string) => {
+    if (!currentTeam || !companyId) return;
+    const staffToAdd = organizationStaff.find(u => u.id === staffId);
+    if (staffToAdd && !currentTeam.members.find(m => m.id === staffId)) {
+      try {
+        const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
+        await updateDoc(teamDocRef, {
+          memberUserIds: arrayUnion(staffId)
+        });
+         // Re-fetch team details to update member list and metrics
+        fetchTeamDetails();
+        toast({
+          title: "Member Added",
+          description: `${staffToAdd.name} has been added to the team.`,
+        });
+      } catch (error) {
+        console.error("Error adding member:", error);
+        toast({ title: "Error", description: "Could not add member.", variant: "destructive" });
+      }
+    }
+  };
+  
+  const availableUsersToAdd = organizationStaff.filter(
     orgUser => !currentTeam?.members.find(teamMember => teamMember.id === orgUser.id)
   );
 
+  if (authLoading || isLoadingTeam) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-40 mb-4" />
+        <Skeleton className="h-12 w-1/2" />
+        <Skeleton className="h-6 w-3/4" />
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-64 w-full lg:col-span-2" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   if (!currentTeam) {
     return (
       <div className="text-center py-10">
-        <h1 className="text-2xl font-semibold">Loading Team Data...</h1>
-        <p className="text-muted-foreground">If the team is not found, you will be redirected.</p>
+        <h1 className="text-2xl font-semibold">Team Not Found</h1>
+        <p className="text-muted-foreground">This team does not exist or you may not have permission to view it.</p>
+        <Button asChild variant="link" className="mt-4">
+          <Link href="/dashboard/teams">Go Back to Teams</Link>
+        </Button>
       </div>
     );
   }
@@ -279,9 +265,9 @@ export default function TeamDetailPage() {
           </Button>
           <h1 className="text-3xl font-bold">{currentTeam.name}</h1>
           <p className="text-muted-foreground">{currentTeam.description}</p>
-          <p className="text-sm text-muted-foreground mt-1">Managed by: {currentTeam.manager}</p>
+          <p className="text-sm text-muted-foreground mt-1">Managed by: {currentTeam.managerName || 'N/A'}</p>
         </div>
-        <Button variant="outline">
+        <Button variant="outline" disabled> {/* TODO: Implement Edit Team Dialog */}
           <Edit className="mr-2 h-4 w-4" /> Edit Team Details
         </Button>
       </div>
@@ -309,24 +295,24 @@ export default function TeamDetailPage() {
             )}
           </CardContent>
           <CardFooter className="border-t pt-4">
-            <Button onClick={() => setIsManageMembersDialogOpen(true)} variant="default" className="w-full">
-              <UserPlus className="mr-2 h-4 w-4" /> Add/Remove Members
+            <Button onClick={() => setIsManageMembersDialogOpen(true)} variant="default" className="w-full" disabled={isLoadingOrgStaff}>
+              <UserPlus className="mr-2 h-4 w-4" /> {isLoadingOrgStaff ? 'Loading Staff...' : 'Add/Remove Members'}
             </Button>
           </CardFooter>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Assigned Templates ({currentTeam.assignedTemplates.length})</CardTitle>
+            <CardTitle className="flex items-center"><FileText className="mr-2 h-5 w-5 text-primary" />Assigned Templates ({currentTeam.assignedTemplates?.length || 0})</CardTitle>
              <CardDescription>Manage card templates available to this team.</CardDescription>
           </CardHeader>
           <CardContent>
-            {currentTeam.assignedTemplates.length > 0 ? (
+            {(currentTeam.assignedTemplates || []).length > 0 ? (
               <ul className="space-y-2">
                 {currentTeam.assignedTemplates.map(template => (
                   <li key={template.id} className="text-sm p-3 bg-secondary/30 rounded-md flex justify-between items-center">
                     {template.name}
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive text-xs">Unassign</Button>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive text-xs" disabled>Unassign</Button>
                   </li>
                 ))}
               </ul>
@@ -338,7 +324,7 @@ export default function TeamDetailPage() {
             </p>
           </CardContent>
           <CardFooter className="border-t pt-4">
-            <Button variant="default" className="w-full">
+            <Button variant="default" className="w-full" disabled>
               Manage Team Templates
             </Button>
           </CardFooter>
@@ -378,9 +364,10 @@ export default function TeamDetailPage() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-lg font-medium text-foreground">Available Organization Users ({availableUsersToAdd.length})</h3>
+              <h3 className="text-lg font-medium text-foreground">Available Organization Staff ({availableUsersToAdd.length})</h3>
                <ScrollArea className="h-[45vh] rounded-md border p-3">
-                {availableUsersToAdd.length > 0 ? (
+                 {isLoadingOrgStaff ? <Skeleton className="h-20 w-full" /> : 
+                  availableUsersToAdd.length > 0 ? (
                   <ul className="space-y-2">
                     {availableUsersToAdd.map(user => (
                       <li key={`available-${user.id}`} className="flex items-center justify-between p-2 bg-secondary/20 rounded-md">
@@ -395,7 +382,7 @@ export default function TeamDetailPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">All organization users are already in this team or no other users available.</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">All organization staff are in this team or no other staff available.</p>
                 )}
               </ScrollArea>
             </div>
@@ -439,9 +426,9 @@ export default function TeamDetailPage() {
             </div>
             <div>
                 <h4 className="font-medium mb-1">Team Manager</h4>
-                <p className="text-sm text-muted-foreground p-2 border rounded bg-secondary/20">{currentTeam.manager}</p>
+                <p className="text-sm text-muted-foreground p-2 border rounded bg-secondary/20">{currentTeam.managerName || 'N/A'}</p>
             </div>
-             <Button variant="outline" className="w-full">
+             <Button variant="outline" className="w-full" disabled> {/* TODO: Implement Edit Team Dialog */}
               <Edit className="mr-2 h-4 w-4" /> Modify Name, Description, or Manager
             </Button>
             <AlertDialog>
@@ -455,7 +442,7 @@ export default function TeamDetailPage() {
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete the team
-                    "{currentTeam.name}" and remove all associated data. Users in this team will
+                    "{currentTeam.name}" and remove all associated data. Staff in this team will
                     not be deleted but will no longer be part of this team.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -473,5 +460,3 @@ export default function TeamDetailPage() {
     </div>
   );
 }
-
-    

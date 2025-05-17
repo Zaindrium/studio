@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react'; // Added useEffect, useCallback
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { db } from '@/lib/firebase'; // Import db
+import { collection, query, getDocs, Timestamp } from 'firebase/firestore'; // Import Firestore functions
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+
 
 interface RolePermission {
   id: string;
@@ -57,46 +62,21 @@ interface Role {
   name: string;
   description: string;
   permissions: RolePermission[]; 
+  // companyId might be implicit if roles are company-specific
 }
 
-const MOCK_PERMISSIONS_DATA: RolePermission[] = [
-    { id: 'perm1', name: 'manage_users', description: 'Can create, edit, and delete users.' },
-    { id: 'perm2', name: 'manage_teams', description: 'Can create, edit, and delete teams.' },
-    { id: 'perm3', name: 'view_analytics', description: 'Can view organization-wide analytics.' },
-    { id: 'perm4', name: 'manage_billing', description: 'Can manage subscription and billing details.' },
-    { id: 'perm5', name: 'create_cards', description: 'Can create business cards.' },
-    { id: 'perm6', name: 'manage_templates', description: 'Can create and manage card templates.' },
-];
-
-const MOCK_ROLES_DATA: Role[] = [
-  { 
-    id: 'role_admin', 
-    name: 'Administrator', 
-    description: 'Full access to all organization features and settings.', 
-    permissions: MOCK_PERMISSIONS_DATA 
-  },
-  { 
-    id: 'role_manager', 
-    name: 'Manager', 
-    description: 'Can manage users and teams, view analytics, and create cards/templates.', 
-    permissions: [MOCK_PERMISSIONS_DATA[0], MOCK_PERMISSIONS_DATA[1], MOCK_PERMISSIONS_DATA[2], MOCK_PERMISSIONS_DATA[5], MOCK_PERMISSIONS_DATA[4]] 
-  },
-  { 
-    id: 'role_employee', 
-    name: 'Employee', 
-    description: 'Can create and manage their own business cards.', 
-    permissions: [MOCK_PERMISSIONS_DATA[4]] 
-  },
-];
+// MOCK_PERMISSIONS_DATA and MOCK_ROLES_DATA removed
 
 const initialNewRoleState: Partial<Role> = {
     name: '',
     description: '',
-    permissions: [],
+    permissions: [], // Permissions management would be more complex
 };
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>(MOCK_ROLES_DATA);
+  const { companyId, loading: authLoading } = useAuth();
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -105,6 +85,47 @@ export default function RolesPage() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [isDeleteRoleAlertOpen, setIsDeleteRoleAlertOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+
+  const fetchRoles = useCallback(async () => {
+    if (!companyId) {
+        if (!authLoading) { /* toast({ title: "Error", description: "Company ID missing. Cannot fetch roles.", variant: "destructive" }); */ }
+        setRoles([]);
+        setIsLoadingRoles(false);
+        return;
+    }
+    setIsLoadingRoles(true);
+    try {
+        // Assuming roles are stored under a 'roles' subcollection in each company
+        // Or a top-level 'roles' collection with a companyId field.
+        // For this example, let's assume they are NOT company-specific yet or we'd need to query by companyId.
+        // If roles are company-specific, path would be e.g., `companies/${companyId}/roles`
+        // For now, will use a general placeholder message if no roles.
+        
+        // Placeholder: In a real app, you'd fetch from Firestore:
+        // const rolesCollectionRef = collection(db, `companies/${companyId}/roles`); // Or a global roles collection
+        // const q = query(rolesCollectionRef);
+        // const querySnapshot = await getDocs(q);
+        // const fetchedRoles: Role[] = [];
+        // querySnapshot.forEach((docSnap) => { ... });
+        // setRoles(fetchedRoles);
+        setRoles([]); // Start with no roles if not fetching
+    } catch (error) {
+        console.error("Error fetching roles:", error);
+        toast({ title: "Error", description: "Could not fetch roles list.", variant: "destructive" });
+    } finally {
+        setIsLoadingRoles(false);
+    }
+  }, [companyId, toast, authLoading]);
+
+  useEffect(() => {
+    if (!authLoading && companyId) { // Also check for companyId
+        fetchRoles();
+    } else if (!authLoading && !companyId) {
+        setRoles([]);
+        setIsLoadingRoles(false);
+    }
+  }, [fetchRoles, authLoading, companyId]);
+
 
   const filteredRoles = useMemo(() => {
     return roles.filter(role =>
@@ -134,36 +155,8 @@ export default function RolesPage() {
 
   const handleSaveRole = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newRoleForm.name?.trim() || !newRoleForm.description?.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill out Name and Description for the role.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (editingRole) {
-      setRoles(roles.map(role => 
-        role.id === editingRole.id ? { ...editingRole, ...newRoleForm } as Role : role
-      ));
-      toast({
-        title: "Role Updated!",
-        description: `Role "${newRoleForm.name}" has been successfully updated.`,
-      });
-    } else {
-      const newRole: Role = {
-        id: `role-${Date.now()}`,
-        name: newRoleForm.name || 'Unnamed Role',
-        description: newRoleForm.description || 'No description',
-        permissions: newRoleForm.permissions || [],
-      };
-      setRoles(prevRoles => [newRole, ...prevRoles]);
-      toast({
-        title: "Role Created!",
-        description: `Role "${newRole.name}" has been successfully created.`,
-      });
-    }
+     // TODO: Implement Firestore save/update logic for roles
+    toast({ title: "Action Incomplete", description: "Saving/updating roles to Firestore not yet implemented.", variant: "default" });
     setIsModifyRoleDialogOpen(false);
   };
   
@@ -174,14 +167,28 @@ export default function RolesPage() {
 
   const handleDeleteRole = () => {
     if (!roleToDelete) return;
-    setRoles(roles.filter(role => role.id !== roleToDelete.id));
-    toast({
-        title: "Role Deleted",
-        description: `Role "${roleToDelete.name}" has been removed. (Simulation)`,
-    });
+    // TODO: Implement Firestore delete logic for roles
+    toast({ title: "Action Incomplete", description: `Deleting role "${roleToDelete.name}" from Firestore not yet implemented.`, variant: "default" });
     setIsDeleteRoleAlertOpen(false);
     setRoleToDelete(null);
   };
+
+  if (authLoading || isLoadingRoles) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-10 w-1/3 mb-4" />
+          <div className="space-y-2">
+            {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -191,7 +198,7 @@ export default function RolesPage() {
                 <CardTitle className="flex items-center"><KeyRound className="mr-2 h-6 w-6 text-primary"/>Roles &amp; Permissions</CardTitle>
                 <CardDescription>Create and manage custom role definitions and their associated access levels.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenModifyRoleDialog()}>
+            <Button onClick={() => handleOpenModifyRoleDialog()} disabled={!companyId}>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Role
             </Button>
         </div>
@@ -223,10 +230,11 @@ export default function RolesPage() {
                   <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{role.description}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {role.permissions.slice(0, 3).map(perm => ( 
+                      {(role.permissions || []).slice(0, 3).map(perm => ( 
                         <Badge key={perm.id} variant="secondary" className="text-xs">{perm.name.replace(/_/g, ' ')}</Badge>
                       ))}
-                      {role.permissions.length > 3 && <Badge variant="outline" className="text-xs">+{role.permissions.length - 3} more</Badge>}
+                      {(role.permissions || []).length > 3 && <Badge variant="outline" className="text-xs">+{ (role.permissions || []).length - 3} more</Badge>}
+                       {(role.permissions || []).length === 0 && <Badge variant="outline" className="text-xs">No permissions</Badge>}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -265,7 +273,7 @@ export default function RolesPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
-                    {searchTerm ? `No roles found for "${searchTerm}".` : "No custom roles defined yet."}
+                    {searchTerm ? `No roles found for "${searchTerm}".` : "No roles defined for this company yet. Click 'Add New Role' to start."}
                   </TableCell>
                 </TableRow>
               )}
@@ -310,23 +318,13 @@ export default function RolesPage() {
                   rows={3}
                 />
               </div>
-              {editingRole && (
-                <div className="space-y-2 pt-2 border-t mt-2">
-                    <Label>Assigned Permissions (Preview)</Label>
-                    {editingRole.permissions.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                        {editingRole.permissions.map(p => <Badge key={p.id} variant="secondary">{p.name.replace(/_/g, ' ')}</Badge>)}
-                        </div>
-                    ) : <p className="text-xs text-muted-foreground">No specific permissions assigned yet.</p> }
-                     <Button type="button" variant="outline" className="w-full mt-2" disabled>Manage Detailed Permissions (Coming Soon)</Button>
-                </div>
-              )}
+              {/* Permissions management UI would go here - complex, for future */}
             </div>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit">{editingRole ? 'Save Changes' : 'Create Role'}</Button>
+              <Button type="submit" disabled={!companyId}>{editingRole ? 'Save Changes (Simulated)' : 'Create Role (Simulated)'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -338,13 +336,13 @@ export default function RolesPage() {
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete the role "{roleToDelete?.name}".
-                Users assigned this role might lose specific access.
+                Users assigned this role might lose specific access. (Action is simulated)
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setRoleToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteRole}>
-                Yes, delete role
+                Yes, delete role (Simulated)
             </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

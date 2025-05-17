@@ -28,10 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Team, StaffRecord } from '@/lib/app-types';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore'; // Added addDoc, serverTimestamp, deleteDoc, doc
 import { Skeleton } from '@/components/ui/skeleton';
-
-// MOCK_TEAMS_DATA is removed. Teams will be fetched or start empty.
 
 interface NewTeamFormState {
   name: string;
@@ -42,28 +40,23 @@ interface NewTeamFormState {
 const initialNewTeamState: NewTeamFormState = {
     name: '',
     description: '',
-    managerId: 'no-manager', // Default to 'no-manager'
+    managerId: 'no-manager', 
 };
 
 export default function TeamsPage() {
   const { currentUser, companyId, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [teams, setTeams] = useState<Team[]>([]); // Initialize with an empty array
+  const [teams, setTeams] = useState<Team[]>([]);
   const { toast } = useToast();
 
   const [isCreateTeamDialogOpen, setIsCreateTeamDialogOpen] = useState(false);
   const [newTeamForm, setNewTeamForm] = useState<NewTeamFormState>(initialNewTeamState);
   const [staffList, setStaffList] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(true); // For fetching teams
 
   const fetchStaff = useCallback(async () => {
-    if (!companyId) {
-        if (!authLoading) {
-            // Toast removed as per previous discussion for a cleaner startup
-            // toast({ title: "Error", description: "Company ID not available to fetch staff.", variant: "destructive" });
-        }
-        return;
-    }
+    if (!companyId) return;
     setIsLoadingStaff(true);
     try {
       const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
@@ -72,42 +65,73 @@ export default function TeamsPage() {
       const fetchedStaff: StaffRecord[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        fetchedStaff.push({
-          id: doc.id,
-          ...data,
-          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
-          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
-          lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt || '-',
-        } as StaffRecord);
+        fetchedStaff.push({ id: doc.id, ...data } as StaffRecord);
       });
       setStaffList(fetchedStaff);
-      // Do not automatically select the first staff member if the list is not empty.
-      // Keep the default 'no-manager' or the current selection.
-      // setNewTeamForm(prev => ({...prev, managerId: fetchedStaff.length > 0 && !prev.managerId ? fetchedStaff[0].id : (prev.managerId || 'no-manager')}));
     } catch (error) {
       console.error("Error fetching staff for manager selection:", error);
-      toast({ title: "Error", description: "Could not fetch staff list for manager selection.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not fetch staff list.", variant: "destructive" });
     } finally {
       setIsLoadingStaff(false);
     }
+  }, [companyId, toast]);
+
+  const fetchTeams = useCallback(async () => {
+    if (!companyId) {
+      if (!authLoading) {
+        // toast({ title: "Error", description: "Company ID not available for teams.", variant: "destructive" });
+      }
+      setIsLoadingTeams(false);
+      setTeams([]);
+      return;
+    }
+    setIsLoadingTeams(true);
+    try {
+      const teamsCollectionRef = collection(db, `companies/${companyId}/teams`);
+      const q = query(teamsCollectionRef);
+      const querySnapshot = await getDocs(q);
+      const fetchedTeams: Team[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        fetchedTeams.push({
+          id: docSnap.id,
+          ...data,
+          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
+          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
+        } as Team);
+      });
+      setTeams(fetchedTeams);
+    } catch (error) {
+      console.error("Error fetching teams:", error);
+      toast({ title: "Error", description: "Could not fetch teams list.", variant: "destructive" });
+    } finally {
+      setIsLoadingTeams(false);
+    }
   }, [companyId, toast, authLoading]);
+
 
   useEffect(() => {
     if (!authLoading && companyId) {
         fetchStaff();
+        fetchTeams();
+    } else if (!authLoading && !companyId) {
+      setStaffList([]);
+      setTeams([]);
+      setIsLoadingStaff(false);
+      setIsLoadingTeams(false);
     }
-    // TODO: Add fetching of teams from Firestore here once backend is ready
-    // For now, teams list remains empty or populated by client-side additions
-  }, [authLoading, companyId, fetchStaff]);
+  }, [authLoading, companyId, fetchStaff, fetchTeams]);
 
 
-  const filteredTeams = teams.filter(team =>
-    team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    team.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTeams = useMemo(() => {
+    return teams.filter(team =>
+      team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      team.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [teams, searchTerm]);
 
   const handleOpenCreateTeamDialog = () => {
-    setNewTeamForm(initialNewTeamState); // Reset form, managerId will be 'no-manager'
+    setNewTeamForm(initialNewTeamState); 
     setIsCreateTeamDialogOpen(true);
   };
 
@@ -115,7 +139,7 @@ export default function TeamsPage() {
     setNewTeamForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveNewTeam = (event: React.FormEvent) => {
+  const handleSaveNewTeam = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!newTeamForm.name?.trim() || !newTeamForm.description?.trim()) {
       toast({
@@ -125,38 +149,72 @@ export default function TeamsPage() {
       });
       return;
     }
-    // Manager is now optional, so no need to validate newTeamForm.managerId here
+    if (!companyId) {
+      toast({ title: "Error", description: "Company context not available.", variant: "destructive" });
+      return;
+    }
 
     const manager = newTeamForm.managerId && newTeamForm.managerId !== 'no-manager'
                     ? staffList.find(staff => staff.id === newTeamForm.managerId)
                     : undefined;
 
-    const newTeam: Team = {
-      id: `team-${Date.now()}`,
+    const newTeamData: Omit<Team, 'id' | 'createdAt' | 'updatedAt' | 'memberCount'> = {
       name: newTeamForm.name,
       description: newTeamForm.description,
-      memberCount: 0,
       managerId: manager ? manager.id : undefined,
-      managerName: manager ? manager.name : undefined, // Or 'N/A' or leave undefined
-      createdAt: new Date().toISOString(),
+      managerName: manager ? manager.name : undefined,
     };
 
-    setTeams(prevTeams => [newTeam, ...prevTeams]);
-    toast({
-      title: "Team Created!",
-      description: `The team "${newTeam.name}" has been successfully created.`,
-    });
-    setIsCreateTeamDialogOpen(false);
+    try {
+      const teamsCollectionRef = collection(db, `companies/${companyId}/teams`);
+      await addDoc(teamsCollectionRef, {
+        ...newTeamData,
+        memberCount: 0, // Initialize member count
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      toast({
+        title: "Team Created!",
+        description: `The team "${newTeamForm.name}" has been successfully created.`,
+      });
+      setIsCreateTeamDialogOpen(false);
+      fetchTeams(); // Re-fetch teams to update the list
+    } catch (error) {
+      console.error("Error creating team:", error);
+      toast({ title: "Error", description: "Could not create team.", variant: "destructive"});
+    }
   };
 
-  const handleDeleteTeam = (teamId: string) => {
-    setTeams(teams.filter(team => team.id !== teamId));
-    toast({
-        title: "Team Deleted",
-        description: "The team has been removed. (Simulation)",
-        variant: "default"
-    });
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!companyId) return;
+    try {
+      const teamDocRef = doc(db, `companies/${companyId}/teams`, teamId);
+      await deleteDoc(teamDocRef);
+      toast({
+          title: "Team Deleted",
+          description: "The team has been removed.",
+          variant: "default"
+      });
+      fetchTeams(); // Re-fetch teams
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      toast({ title: "Error", description: "Could not delete team.", variant: "destructive"});
+    }
   };
+
+  if (authLoading || isLoadingTeams) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <Skeleton className="h-10 w-full md:max-w-sm" />
+            <Skeleton className="h-10 w-40" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-56 w-full" />)}
+        </div>
+      </div>
+    );
+  }
 
 
   return (
@@ -171,7 +229,7 @@ export default function TeamsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button onClick={handleOpenCreateTeamDialog} disabled={!companyId}>
+        <Button onClick={handleOpenCreateTeamDialog} disabled={!companyId || isLoadingStaff}>
           <PlusCircle className="mr-2 h-5 w-5" /> Create New Team
         </Button>
       </div>
@@ -227,7 +285,7 @@ export default function TeamsPage() {
                     </Select>
                 )}
                 {staffList.length === 0 && !isLoadingStaff && (
-                    <p className="text-xs text-muted-foreground">No staff available to assign as manager.</p>
+                    <p className="text-xs text-muted-foreground">No staff available to assign as manager. Create staff members first.</p>
                 )}
               </div>
             </div>
@@ -241,8 +299,7 @@ export default function TeamsPage() {
         </DialogContent>
       </Dialog>
 
-
-      {filteredTeams.length === 0 && searchTerm && (
+      {filteredTeams.length === 0 && searchTerm && !isLoadingTeams && (
         <Card className="text-center py-8">
           <CardHeader>
             <CardTitle>No Teams Found</CardTitle>
@@ -254,7 +311,7 @@ export default function TeamsPage() {
         </Card>
       )}
 
-      {filteredTeams.length === 0 && !searchTerm && (
+      {teams.length === 0 && !searchTerm && !isLoadingTeams && (
          <Card className="text-center py-12">
           <CardHeader>
              <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -262,7 +319,7 @@ export default function TeamsPage() {
             <CardDescription>Get started by creating your first team to organize users and assign resources.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleOpenCreateTeamDialog} size="lg" disabled={!companyId}>
+            <Button onClick={handleOpenCreateTeamDialog} size="lg" disabled={!companyId || isLoadingStaff}>
               <PlusCircle className="mr-2 h-5 w-5" /> Create Your First Team
             </Button>
           </CardContent>
@@ -286,7 +343,7 @@ export default function TeamsPage() {
               <p className="text-sm text-muted-foreground mb-3 min-h-[40px]">{team.description}</p>
               <div className="flex items-center text-sm">
                 <Users className="mr-2 h-4 w-4 text-primary" />
-                <span>{team.memberCount} Members</span>
+                <span>{team.memberCount || 0} Members</span> {/* Default to 0 if undefined */}
               </div>
             </CardContent>
             <CardFooter className="border-t pt-4 flex justify-end gap-2">

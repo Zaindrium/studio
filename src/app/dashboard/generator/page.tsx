@@ -3,22 +3,15 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-// Removed Header as this page is now within the dashboard layout
 import { UserProfileForm } from '@/components/UserProfileForm';
 import { CardPreview } from '@/components/CardPreview';
-
-// OnboardingDialog might not be relevant here, or could be adapted
-// import { QuickShareFAB } from '@/components/QuickShareFAB'; // FAB might conflict with dashboard structure, review later
 import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
-import { appTemplates, defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types';
-import { Skeleton } from '@/components/ui/skeleton';
+import { defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types';
 import { sanitizeForUrl } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Blocks } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-
-// Dynamically import larger components
 const CardDesigner = dynamic(() => import('@/components/CardDesigner').then(mod => mod.CardDesigner), {
   loading: () => <Skeleton className="h-[400px] w-full rounded-lg" />,
 });
@@ -29,43 +22,38 @@ const ShareCard = dynamic(() => import('@/components/ShareCard').then(mod => mod
   loading: () => <Skeleton className="h-[200px] w-full rounded-lg" />,
 });
 
-
-// const ONBOARDING_STORAGE_KEY = 'linkup_onboarding_completed_admin_context'; 
-
-export default function GeneratorPage() { // Was EditorPage
-  const initialTemplate = appTemplates.length > 0 ? appTemplates[0] : {
-    id: 'default-staff-card',
-    name: 'Default Staff Card',
-    description: 'A default card if no templates are found.',
-    profile: defaultStaffCardData,
-    design: defaultCardDesignSettings,
-  };
-
-  const [staffCardProfile, setStaffCardProfile] = useState<StaffCardData>(initialTemplate.profile);
-  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
+export default function GeneratorPage() {
+  // Initialize with minimal default data, not template-specific data
+  const [staffCardProfile, setStaffCardProfile] = useState<StaffCardData>(defaultStaffCardData);
+  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(defaultCardDesignSettings);
   const [isClient, setIsClient] = useState(false);
-  // const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    // if (typeof window !== "undefined") {
-    //     const onboardingCompleted = localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    //     if (onboardingCompleted !== 'true') {
-    //         // setShowOnboarding(true); 
-    //     }
-    // }
+    // Initialize with default data. In a real app, you'd fetch data for a specific staff member
+    // if an ID is provided (e.g., via query param or context if editing a specific card).
+    // For now, it starts with the blank defaults.
+    setStaffCardProfile(defaultStaffCardData);
+    setCardDesign(defaultCardDesignSettings);
   }, []);
 
   useEffect(() => {
-    if (isClient) {
+    if (isClient && staffCardProfile.name) { // Only generate QR if name exists
       const cardIdentifier = sanitizeForUrl(staffCardProfile.name);
-      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}`; // Example: /card/jane-doe-staff
+      // For the generator, the QR code might point to a generic preview or be less critical
+      // than on a live staff card. Let's use a placeholder or a non-specific URL for now.
+      // Or, if admins create a "fingerprint" URL here, it would be used.
+      // For simplicity, we'll use a sanitized name.
+      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}-preview`; // Example
       setCardDesign(prev => {
         if (prev.qrCodeUrl !== newQrCodeUrl) {
           return { ...prev, qrCodeUrl: newQrCodeUrl };
         }
         return prev;
       });
+    } else if (isClient && !staffCardProfile.name) {
+        // If name is cleared, clear the QR code URL or set to a default
+        setCardDesign(prev => ({ ...prev, qrCodeUrl: '' }));
     }
   }, [staffCardProfile.name, isClient]);
 
@@ -125,21 +113,14 @@ export default function GeneratorPage() { // Was EditorPage
     handleProfileChange(aiData);
   }, [handleProfileChange]);
 
-  // const handleOnboardingClose = useCallback(() => { 
-  //   setShowOnboarding(false);
-  //   if (typeof window !== "undefined") {
-  //       localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
-  //   }
-  // }, []);
 
   if (!isClient) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
-        {/* No Header component from src/components/Header here */}
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <Card className="mb-6">
-            <CardHeader>
-                <CardTitle className="flex items-center"><Blocks className="mr-2 h-6 w-6 text-primary"/>Digital Card Editor</CardTitle>
+      <div className="flex flex-col bg-background">
+        <main className="flex-grow px-0 py-0">
+          <Card className="mb-6 shadow-none border-0 rounded-none">
+            <CardHeader className="pb-2 pt-0 px-0">
+                <CardTitle className="flex items-center text-xl"><Blocks className="mr-2 h-5 w-5 text-primary"/>Digital Card Editor</CardTitle>
                 <CardDescription>Design and customize digital business cards for your staff.</CardDescription>
             </CardHeader>
           </Card>
@@ -156,50 +137,43 @@ export default function GeneratorPage() { // Was EditorPage
             </div>
           </div>
         </main>
-        {/* No Footer component from src/components/Footer here */}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col bg-background"> {/* Removed min-h-screen as it's part of dashboard layout */}
-      {/* No Header component from src/components/Header here */}
-      <main className="flex-grow px-0 py-0"> {/* Removed container and padding, handled by dashboard layout */}
-        {/* {isClient && <OnboardingDialog isOpen={showOnboarding} onClose={handleOnboardingClose} />} */}
+    <div className="flex flex-col bg-background">
+      <main className="flex-grow px-0 py-0">
         
         <Card className="mb-6 shadow-none border-0 rounded-none">
           <CardHeader className="pb-2 pt-0 px-0">
               <CardTitle className="flex items-center text-xl"><Blocks className="mr-2 h-5 w-5 text-primary"/>Digital Card Editor</CardTitle>
-              <CardDescription>Design and customize digital business cards. Start by filling the form or selecting a template.</CardDescription>
+              <CardDescription>Design and customize a digital business card. This data will be used when adding new staff.</CardDescription>
           </CardHeader>
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">
             <UserProfileForm profile={staffCardProfile} onProfileChange={handleProfileChange} />
- <Suspense fallback={<Skeleton className="h-[400px] w-full rounded-lg" />}>
+             <Suspense fallback={<Skeleton className="h-[400px] w-full rounded-lg" />}>
               <CardDesigner design={cardDesign} onDesignChange={handleDesignChange} />
- </Suspense>
- <Suspense fallback={<Skeleton className="h-[300px] w-full rounded-lg" />}>
+             </Suspense>
+             <Suspense fallback={<Skeleton className="h-[300px] w-full rounded-lg" />}>
               <AiDesignAssistant
- userProfile={staffCardProfile}
- currentDesign={cardDesign}
- onApplySuggestions={handleAiApplySuggestions}
- onUpdateProfileForAI={handleUpdateProfileForAI}
- />
- </Suspense>
+                 userProfile={staffCardProfile}
+                 currentDesign={cardDesign}
+                 onApplySuggestions={handleAiApplySuggestions}
+                 onUpdateProfileForAI={handleUpdateProfileForAI}
+              />
+             </Suspense>
           </div>
 
           <div className="lg:col-span-1 space-y-8 lg:sticky lg:top-8">
             <CardPreview profile={staffCardProfile} design={cardDesign} />
-            <ShareCard cardUrl={cardDesign.qrCodeUrl} />
+            {staffCardProfile.name && cardDesign.qrCodeUrl && <ShareCard cardUrl={cardDesign.qrCodeUrl} />}
           </div>
         </div>
- <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-lg" />}>
-          <ShareCard cardUrl={cardDesign.qrCodeUrl} />
- </Suspense>
       </main>
-      {/* No Footer component from src/components/Footer here */}
     </div>
   );
 }

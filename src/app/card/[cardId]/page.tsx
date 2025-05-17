@@ -4,8 +4,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { CardPreview } from '@/components/CardPreview';
-import { appTemplates } from '@/lib/types';
-import type { UserProfile, CardDesignSettings, ContactInfo } from '@/lib/types';
+// appTemplates removed as we're moving away from mock data
+import type { StaffRecord, StaffCardData, CardDesignSettings, ContactInfo } from '@/lib/app-types';
+import { defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types'; // Import defaults
 import { sanitizeForUrl, ensureHttps } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -24,16 +25,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { MessageSquarePlus } from 'lucide-react';
+import { db } from '@/lib/firebase'; // Import db
+import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
+import { useAuth } from '@/contexts/auth-context'; // To potentially get companyId if admin is viewing
 
 const CONTACTS_STORAGE_KEY = 'linkup_collected_contacts';
 
 export default function PublicCardPage() {
   const params = useParams();
-  const cardId = typeof params.cardId === 'string' ? params.cardId : '';
+  const cardIdFromUrl = typeof params.cardId === 'string' ? params.cardId : ''; // This is the fingerprintUrl
   const { toast } = useToast();
+  const { companyId: loggedInAdminCompanyId } = useAuth(); // Get companyId if an admin is logged in
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<StaffCardData | null>(null);
   const [design, setDesign] = useState<CardDesignSettings | null>(null);
+  const [cardOwnerName, setCardOwnerName] = useState<string>('the card owner'); // For dialogs
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,31 +51,62 @@ export default function PublicCardPage() {
   const [contactMessage, setContactMessage] = useState('');
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
 
-
   useEffect(() => {
-    if (cardId) {
+    const fetchCardData = async () => {
+      if (!cardIdFromUrl) {
+        setError('No card ID provided in the URL.');
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setError(null);
-      
-      const foundTemplate = appTemplates.find(
-        (template) => sanitizeForUrl(template.profile.name) === cardId
-      );
 
-      if (foundTemplate) {
-        setProfile(foundTemplate.profile);
-        setDesign({
-          ...foundTemplate.design,
-          qrCodeUrl: typeof window !== "undefined" ? window.location.href : '', 
-        });
-      } else {
-        setError('Card not found. The link may be incorrect or the card may have been removed.');
-      }
-      setIsLoading(false);
-    } else {
-        setError('No card ID provided.');
+      try {
+        // For this to work publicly without knowing the companyId, you'd typically:
+        // 1. Have a top-level collection `publicCards` where doc ID = fingerprintUrl.
+        // 2. Or, use a Cloud Function backend endpoint that can query across companies (less efficient).
+        // For now, we'll simulate by trying to find it in the logged-in admin's company,
+        // or use a placeholder/demo company if no admin is logged in and it's a public view.
+        // THIS IS A SIMPLIFIED APPROACH FOR THE REFACTOR and not a robust public solution.
+
+        let foundStaffRecord: StaffRecord | null = null;
+        
+        // Attempt to find the staff record. This query is inefficient for a truly public page.
+        // In a real app, you would have a direct way to fetch a card by its public ID.
+        const companiesCollectionRef = collection(db, 'companies');
+        const companiesSnapshot = await getDocs(companiesCollectionRef);
+
+        for (const companyDoc of companiesSnapshot.docs) {
+          const staffCollectionRef = collection(db, `companies/${companyDoc.id}/staff`);
+          const staffQuery = query(staffCollectionRef, where("fingerprintUrl", "==", cardIdFromUrl), limit(1));
+          const staffSnapshot = await getDocs(staffQuery);
+
+          if (!staffSnapshot.empty) {
+            foundStaffRecord = { id: staffSnapshot.docs[0].id, ...staffSnapshot.docs[0].data() } as StaffRecord;
+            break; // Found the card
+          }
+        }
+
+        if (foundStaffRecord && foundStaffRecord.cardDisplayData && foundStaffRecord.designSettings) {
+          setProfile(foundStaffRecord.cardDisplayData);
+          setCardOwnerName(foundStaffRecord.cardDisplayData.name || 'the card owner');
+          setDesign({
+            ...foundStaffRecord.designSettings,
+            qrCodeUrl: typeof window !== "undefined" ? window.location.href : '', 
+          });
+        } else {
+          setError('Card not found. The link may be incorrect or the card may have been removed.');
+        }
+      } catch (e) {
+        console.error("Error fetching public card data:", e);
+        setError('Could not load card data. Please try again later.');
+      } finally {
         setIsLoading(false);
-    }
-  }, [cardId]);
+      }
+    };
+
+    fetchCardData();
+  }, [cardIdFromUrl, loggedInAdminCompanyId]); // loggedInAdminCompanyId is illustrative here for demo
 
   const handleSaveContact = () => {
     if (!profile) return;
@@ -84,7 +121,7 @@ export default function PublicCardPage() {
     vcfContent += `FN:${profile.name}\n`;
 
     if (profile.title) vcfContent += `TITLE:${profile.title}\n`;
-    if (profile.company) vcfContent += `ORG:${profile.company}\n`;
+    if (profile.companyName) vcfContent += `ORG:${profile.companyName}\n`; // Use companyName from StaffCardData
     if (profile.phone) vcfContent += `TEL;TYPE=WORK,VOICE:${profile.phone}\n`;
     if (profile.email) vcfContent += `EMAIL:${profile.email}\n`;
     if (profile.website) vcfContent += `URL:${ensureHttps(profile.website)}\n`;
@@ -98,7 +135,7 @@ export default function PublicCardPage() {
          vcfContent += `PHOTO;VALUE=URL:${profile.profilePictureUrl}\n`;
      }
 
-    if (profile.userInfo) vcfContent += `NOTE:About Me: ${profile.userInfo.replace(/\n/g, '\\n')}\n`;
+    if (profile.userInfo) vcfContent += `NOTE:About Staff: ${profile.userInfo.replace(/\n/g, '\\n')}\n`; // Changed from "About Me"
 
     vcfContent += 'END:VCARD';
     
@@ -132,7 +169,7 @@ export default function PublicCardPage() {
       phone: contactPhone || undefined,
       company: contactCompany || undefined,
       message: contactMessage || undefined,
-      submittedFromCardId: cardId,
+      submittedFromCardId: cardIdFromUrl,
       submittedAt: new Date().toISOString(),
     };
 
@@ -144,7 +181,7 @@ export default function PublicCardPage() {
 
       toast({
         title: "Details Sent!",
-        description: `Thank you, ${contactName}! Your information has been shared with ${profile?.name || 'the card owner'}.`,
+        description: `Thank you, ${contactName}! Your information has been shared with ${cardOwnerName}.`,
       });
       setIsContactDialogOpen(false);
       // Reset form
@@ -169,6 +206,7 @@ export default function PublicCardPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 bg-background">
         <Skeleton className="w-full max-w-sm h-[calc(100vw_*_16/9)] sm:h-[650px] rounded-lg shadow-xl" />
+        <p className="mt-4 text-muted-foreground">Loading card...</p>
       </div>
     );
   }
@@ -178,7 +216,7 @@ export default function PublicCardPage() {
       <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <h1 className="text-2xl font-semibold text-destructive mb-4">Error</h1>
         <p className="text-lg text-muted-foreground">{error}</p>
-        <a href="/editor" className="mt-6 text-primary hover:underline">Go to Homepage</a>
+        <Link href="/login" className="mt-6 text-primary hover:underline">Go to Login</Link>
       </div>
     );
   }
@@ -202,14 +240,14 @@ export default function PublicCardPage() {
                     color: design.colorScheme.cardBackground // Ensure contrast
                 }}
              >
-                <MessageSquarePlus className="mr-2 h-5 w-5" /> Connect with {profile.name}
+                <MessageSquarePlus className="mr-2 h-5 w-5" /> Connect with {cardOwnerName}
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Connect with {profile.name}</DialogTitle>
+              <DialogTitle>Connect with {cardOwnerName}</DialogTitle>
               <DialogDescription>
-                Leave your details, and {profile.name} can get in touch with you.
+                Leave your details, and {cardOwnerName} can get in touch with you.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmitContactForm}>
@@ -253,8 +291,8 @@ export default function PublicCardPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
-        <p className="text-lg text-muted-foreground">Could not load card data.</p>
-         <a href="/editor" className="mt-6 text-primary hover:underline">Go to Homepage</a>
+        <p className="text-lg text-muted-foreground">Could not load card data. The card may not exist or the link is incorrect.</p>
+         <Link href="/login" className="mt-6 text-primary hover:underline">Go to Login</Link>
     </div>
   );
 }

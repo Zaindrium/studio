@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, lazy, Suspense, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,33 +11,49 @@ import {
   TableBody,
   TableHeader,
   TableRow,
+  TableHead,
+  TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import type { AuthenticatedUser, UserStatus } from '@/lib/app-types'; 
+import type { AdminUser, UserStatus } from '@/lib/app-types'; 
 import {
   DropdownMenu,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuContent,
 } from "@/components/ui/dropdown-menu";
-import { TableCell, TableHead } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, query, getDocs, Timestamp } from 'firebase/firestore'; // Removed addDoc, updateDoc, deleteDoc for now
+
 
 // Dynamically import Dialog and AlertDialog
 const LazyDialog = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.Dialog })));
+const LazyDialogContent = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.DialogContent })));
+const LazyDialogHeader = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.DialogHeader })));
+const LazyDialogTitle = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.DialogTitle })));
+const LazyDialogDescription = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.DialogDescription })));
+const LazyDialogFooter = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.DialogFooter })));
+const LazyDialogClose = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.DialogClose })));
+
 const LazyAlertDialog = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialog })));
+const LazyAlertDialogContent = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogContent })));
+const LazyAlertDialogHeader = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogHeader })));
+const LazyAlertDialogTitle = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogTitle })));
+const LazyAlertDialogDescription = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogDescription })));
+const LazyAlertDialogFooter = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogFooter })));
+const LazyAlertDialogCancel = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogCancel })));
+const LazyAlertDialogAction = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogAction })));
 
 
-const MOCK_ADMINS_DATA: AuthenticatedUser[] = [
-  { id: 'admin1', name: 'Alice Admin', email: 'alice.admin@example.com', role: 'Admin', status: 'Active', teamId: undefined, lastLoginAt: '2024-07-30 10:00 AM', cardsCreatedCount: 0, createdAt: '2023-01-10' },
-  { id: 'admin2', name: 'Robert ManagerAdmin', email: 'bob.admin@example.com', role: 'Admin', status: 'Active', teamId: undefined, lastLoginAt: '2024-07-29 09:30 AM', cardsCreatedCount: 0, createdAt: '2023-02-15' },
-  { id: 'admin3', name: 'Charlie Invited', email: 'charlie.newadmin@example.com', role: 'Admin', status: 'Invited', teamId: undefined, lastLoginAt: '-', cardsCreatedCount: 0, createdAt: '2024-07-28' },
-];
+// MOCK_ADMINS_DATA removed
 
-const initialNewAdminState: Partial<AuthenticatedUser> = {
+const initialNewAdminState: Partial<AdminUser> = {
     name: '',
     email: '',
     role: 'Admin', 
@@ -45,15 +61,58 @@ const initialNewAdminState: Partial<AuthenticatedUser> = {
 };
 
 export default function AdministratorsPage() {
-  const [administrators, setAdministrators] = useState<AuthenticatedUser[]>(MOCK_ADMINS_DATA);
+  const { companyId, loading: authLoading } = useAuth();
+  const [administrators, setAdministrators] = useState<AdminUser[]>([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   const [isInviteAdminDialogOpen, setIsInviteAdminDialogOpen] = useState(false);
-  const [newAdminForm, setNewAdminForm] = useState<Partial<AuthenticatedUser>>(initialNewAdminState);
-  const [editingAdmin, setEditingAdmin] = useState<AuthenticatedUser | null>(null);
+  const [newAdminForm, setNewAdminForm] = useState<Partial<AdminUser>>(initialNewAdminState);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [isDeleteAdminAlertOpen, setIsDeleteAdminAlertOpen] = useState(false);
-  const [adminToDelete, setAdminToDelete] = useState<AuthenticatedUser | null>(null);
+  const [adminToDelete, setAdminToDelete] = useState<AdminUser | null>(null);
+
+  const fetchAdmins = useCallback(async () => {
+    if (!companyId) {
+        if (!authLoading) { /* toast({ title: "Error", description: "Company ID missing. Cannot fetch admins.", variant: "destructive" }); */ }
+        setAdministrators([]);
+        setIsLoadingAdmins(false);
+        return;
+    }
+    setIsLoadingAdmins(true);
+    try {
+        const adminsCollectionRef = collection(db, `companies/${companyId}/admins`);
+        const q = query(adminsCollectionRef);
+        const querySnapshot = await getDocs(q);
+        const fetchedAdmins: AdminUser[] = [];
+        querySnapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            fetchedAdmins.push({
+                id: docSnap.id,
+                ...data,
+                createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
+                updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
+                lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt || '-',
+            } as AdminUser);
+        });
+        setAdministrators(fetchedAdmins);
+    } catch (error) {
+        console.error("Error fetching administrators:", error);
+        toast({ title: "Error", description: "Could not fetch administrators list.", variant: "destructive" });
+    } finally {
+        setIsLoadingAdmins(false);
+    }
+  }, [companyId, toast, authLoading]);
+
+  useEffect(() => {
+    if (!authLoading && companyId) {
+        fetchAdmins();
+    } else if (!authLoading && !companyId) {
+        setAdministrators([]);
+        setIsLoadingAdmins(false);
+    }
+  }, [fetchAdmins, authLoading, companyId]);
 
 
   const filteredAdmins = useMemo(() => {
@@ -63,7 +122,7 @@ export default function AdministratorsPage() {
     );
   }, [administrators, searchTerm]);
 
-  const handleOpenInviteAdminDialog = (adminToEdit: AuthenticatedUser | null = null) => {
+  const handleOpenInviteAdminDialog = (adminToEdit: AdminUser | null = null) => {
     if (adminToEdit) {
       setEditingAdmin(adminToEdit);
       setNewAdminForm({
@@ -79,73 +138,39 @@ export default function AdministratorsPage() {
     setIsInviteAdminDialogOpen(true);
   };
   
-  const handleFormChange = (field: keyof Partial<AuthenticatedUser>, value: string | UserStatus) => {
+  const handleFormChange = (field: keyof Partial<AdminUser>, value: string | UserStatus) => {
     setNewAdminForm(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSaveAdmin = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newAdminForm.name?.trim() || !newAdminForm.email?.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill out Name and Email for the administrator.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (editingAdmin) {
-      setAdministrators(administrators.map(admin => 
-        admin.id === editingAdmin.id ? { ...editingAdmin, ...newAdminForm, role: 'Admin' } as AuthenticatedUser : admin
-      ));
-      toast({
-        title: "Administrator Updated!",
-        description: `Administrator "${newAdminForm.name}" has been successfully updated.`,
-      });
-    } else {
-      const newAdmin: AuthenticatedUser = {
-        id: `admin-${Date.now()}`,
-        name: newAdminForm.name || '',
-        email: newAdminForm.email || '',
-        role: 'Admin',
-        status: 'Invited', 
-        createdAt: new Date().toISOString().split('T')[0], 
-        cardsCreatedCount: 0,
-        lastLoginAt: '-',
-      };
-      setAdministrators(prevAdmins => [newAdmin, ...prevAdmins]);
-      toast({
-        title: "Administrator Invited!",
-        description: `An invitation email would be sent to "${newAdmin.name}".`,
-      });
-    }
+    // TODO: Implement Firestore save/update logic for admins
+    toast({ title: "Action Incomplete", description: "Saving/updating admins to Firestore not yet implemented.", variant: "default" });
     setIsInviteAdminDialogOpen(false);
   };
   
-  const confirmDeleteAdmin = (admin: AuthenticatedUser) => {
+  const confirmDeleteAdmin = (admin: AdminUser) => {
     setAdminToDelete(admin);
     setIsDeleteAdminAlertOpen(true);
   };
 
   const handleDeleteAdmin = () => {
     if (!adminToDelete) return;
-    setAdministrators(administrators.filter(admin => admin.id !== adminToDelete.id));
-    toast({
-        title: "Administrator Deleted",
-        description: `Administrator "${adminToDelete.name}" has been removed. (Simulation)`,
-    });
+    // TODO: Implement Firestore delete logic for admins
+    toast({ title: "Action Incomplete", description: `Deleting admin "${adminToDelete.name}" from Firestore not yet implemented.`, variant: "default" });
     setIsDeleteAdminAlertOpen(false);
     setAdminToDelete(null);
   };
 
   const handleToggleAdminStatus = (adminId: string) => {
+    // TODO: Implement Firestore status update logic
     setAdministrators(prevAdmins => 
       prevAdmins.map(admin => {
         if (admin.id === adminId) {
           const newStatus = admin.status === 'Active' ? 'Inactive' : 'Active';
           toast({
-            title: `Status Changed for ${admin.name}`,
-            description: `${admin.name} is now ${newStatus}.`
+            title: `Status Change (Simulated) for ${admin.name}`,
+            description: `${admin.name} is now ${newStatus}. Backend update needed.`
           });
           return { ...admin, status: newStatus };
         }
@@ -155,9 +180,10 @@ export default function AdministratorsPage() {
   };
   
   const handleResendInvite = (adminEmail: string, adminName: string) => {
+    // TODO: Implement actual email sending logic
     toast({
-      title: "Invitation Resent",
-      description: `An invitation email would be resent to ${adminName} at ${adminEmail}. (Simulation)`
+      title: "Invitation Resent (Simulated)",
+      description: `An invitation email would be resent to ${adminName} at ${adminEmail}. Backend update needed.`
     });
   };
 
@@ -170,6 +196,23 @@ export default function AdministratorsPage() {
     }
   };
 
+  if (authLoading || isLoadingAdmins) {
+    return (
+       <Card>
+        <CardHeader>
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-10 w-1/3 mb-4" />
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -178,7 +221,7 @@ export default function AdministratorsPage() {
                 <CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary"/>Administrators</CardTitle>
                 <CardDescription>Manage administrator accounts and their permissions for your organization.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenInviteAdminDialog()}>
+            <Button onClick={() => handleOpenInviteAdminDialog()} disabled={!companyId}>
                 <PlusCircle className="mr-2 h-5 w-5" /> Invite New Administrator
             </Button>
         </div>
@@ -210,7 +253,7 @@ export default function AdministratorsPage() {
                   <TableCell className="font-medium">{admin.name}</TableCell>
                   <TableCell>{admin.email}</TableCell>
                   <TableCell><Badge variant={getStatusVariant(admin.status)}>{admin.status}</Badge></TableCell>
-                  <TableCell>{admin.lastLoginAt}</TableCell>
+                  <TableCell>{typeof admin.lastLoginAt === 'string' ? admin.lastLoginAt : (admin.lastLoginAt as Timestamp)?.toDate?.().toLocaleString() || '-'}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -253,7 +296,7 @@ export default function AdministratorsPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center">
-                    {searchTerm ? `No administrators found for "${searchTerm}".` : "No administrators invited yet."}
+                    {searchTerm ? `No administrators found for "${searchTerm}".` : "No administrators for this company yet."}
                   </TableCell>
                 </TableRow>
               )}
@@ -267,20 +310,16 @@ export default function AdministratorsPage() {
         </CardFooter>
       )}
 
-      <Suspense fallback={isInviteAdminDialogOpen ? <Skeleton className=\"w-full h-[300px] rounded-lg\" /> : null}>
-        <LazyDialog open={isInviteAdminDialogOpen} onOpenChange={setIsInviteAdminDialogOpen}>
-          {/* Import and use DialogContent and other sub-components directly if they are small
-              or lazy load them as well if they are large. For simplicity, assuming they are small.
-              If DialogContent itself is large, it might need its own lazy load.
-           */}
-          <Suspense fallback={<Skeleton className=\"w-full h-[250px] rounded-lg\" />}>
-            <import(\"@/components/ui/dialog\").then(m => m.DialogContent) className="sm:max-w-md">
-              <import(\"@/components/ui/dialog\").then(m => m.DialogHeader)>
-                <import(\"@/components/ui/dialog\").then(m => m.DialogTitle)>{editingAdmin ? 'Edit Administrator' : 'Invite New Administrator'}</import(\"@/components/ui/dialog\").then(m => m.DialogTitle)>
-                <import(\"@/components/ui/dialog\").then(m => m.DialogDescription)>
+      <Suspense fallback={isInviteAdminDialogOpen ? <Skeleton className="w-full h-[300px] rounded-lg" /> : null}>
+        {isInviteAdminDialogOpen && (
+          <LazyDialog open={isInviteAdminDialogOpen} onOpenChange={setIsInviteAdminDialogOpen}>
+            <LazyDialogContent className="sm:max-w-md">
+              <LazyDialogHeader>
+                <LazyDialogTitle>{editingAdmin ? 'Edit Administrator' : 'Invite New Administrator'}</LazyDialogTitle>
+                <LazyDialogDescription>
                   {editingAdmin ? `Update details for ${editingAdmin.name}.` : 'Fill in the details below to invite a new administrator. They will receive an email with setup instructions.'}
-                </import(\"@/components/ui/dialog\").then(m => m.DialogDescription)>
-              </import(\"@/components/ui/dialog\").then(m => m.DialogHeader)>
+                </LazyDialogDescription>
+              </LazyDialogHeader>
               <form onSubmit={handleSaveAdmin}>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
@@ -302,44 +341,43 @@ export default function AdministratorsPage() {
                       onChange={(e) => handleFormChange('email', e.target.value)}
                       placeholder="e.g., alex.admin@example.com"
                       required
-                      disabled={!!editingAdmin}
+                      disabled={!!editingAdmin} // Email usually not editable after creation
                     />
                      {editingAdmin && <p className="text-xs text-muted-foreground">Email address cannot be changed after creation.</p>}
                   </div>
                 </div>
-                <import(\"@/components/ui/dialog\").then(m => m.DialogFooter)>
-                  <import(\"@/components/ui/dialog\").then(m => m.DialogClose) asChild>
+                <LazyDialogFooter>
+                  <LazyDialogClose asChild>
                     <Button type="button" variant="outline">Cancel</Button>
-                  </import(\"@/components/ui/dialog\").then(m => m.DialogClose)>
-                  <Button type="submit">{editingAdmin ? 'Save Changes' : 'Send Invitation'}</Button>
-                </import(\"@/components/ui/dialog\").then(m => m.DialogFooter)>
+                  </LazyDialogClose>
+                  <Button type="submit">{editingAdmin ? 'Save Changes (Simulated)' : 'Send Invitation (Simulated)'}</Button>
+                </LazyDialogFooter>
               </form>
-            </import(\"@/components/ui/dialog\").then(m => m.DialogContent)>
-          </Suspense>
-        </LazyDialog>
+            </LazyDialogContent>
+          </LazyDialog>
+        )}
       </Suspense>
 
-      <Suspense fallback={isDeleteAdminAlertOpen ? <Skeleton className=\"w-full h-[200px] rounded-lg\" /> : null}>
-        <LazyAlertDialog open={isDeleteAdminAlertOpen} onOpenChange={setIsDeleteAdminAlertOpen}>
-          {/* Import and use AlertDialogContent and other sub-components directly or lazy load them */}
-          <Suspense fallback={<Skeleton className=\"w-full h-[150px] rounded-lg\" />}>
-            <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogContent)>
-              <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogHeader)>
-                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogTitle)>Are you absolutely sure?</import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogTitle)>
-                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogDescription)>
+      <Suspense fallback={isDeleteAdminAlertOpen ? <Skeleton className="w-full h-[200px] rounded-lg" /> : null}>
+        {isDeleteAdminAlertOpen && (
+          <LazyAlertDialog open={isDeleteAdminAlertOpen} onOpenChange={setIsDeleteAdminAlertOpen}>
+            <LazyAlertDialogContent>
+              <LazyAlertDialogHeader>
+                <LazyAlertDialogTitle>Are you absolutely sure?</LazyAlertDialogTitle>
+                <LazyAlertDialogDescription>
                     This action cannot be undone. This will permanently delete the administrator account for "{adminToDelete?.name}".
-                    They will lose all administrative privileges.
-                </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogDescription)>
-              </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogHeader)>
-              <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogFooter)>
-                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogCancel) onClick={() => setAdminToDelete(null)}>Cancel</import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogCancel)>
-                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogAction) onClick={handleDeleteAdmin}>
-                    Yes, delete administrator
-                </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogAction)>
-              </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogFooter)>
-            </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogContent)>
-          </Suspense>
-        </LazyAlertDialog>
+                    They will lose all administrative privileges. (Action is simulated)
+                </LazyAlertDialogDescription>
+              </LazyAlertDialogHeader>
+              <LazyAlertDialogFooter>
+                <LazyAlertDialogCancel onClick={() => setAdminToDelete(null)}>Cancel</LazyAlertDialogCancel>
+                <LazyAlertDialogAction onClick={handleDeleteAdmin}>
+                    Yes, delete administrator (Simulated)
+                </LazyAlertDialogAction>
+              </LazyAlertDialogFooter>
+            </LazyAlertDialogContent>
+          </LazyAlertDialog>
+        )}
       </Suspense>
     </Card>
   );

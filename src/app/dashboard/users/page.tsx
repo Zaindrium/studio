@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, Link as LinkIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { StaffRecord, StaffRole, UserStatus, Team } from '@/lib/app-types';
+import { defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types';
 import Link from 'next/link';
 import { sanitizeForUrl } from '@/lib/utils';
 import {
@@ -64,26 +65,21 @@ import {
   updateDoc, 
   deleteDoc, 
   serverTimestamp, 
-  Timestamp 
+  Timestamp,
+  deleteField 
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
-
-const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
-  { id: 'team1', name: 'Sales Team Alpha' },
-  { id: 'team2', name: 'Marketing Crew Gamma' },
-  { id: 'team3', name: 'Engineering Squad Beta' },
-];
 
 const generateUniqueFingerprint = () => {
   return sanitizeForUrl(`staff-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`);
 };
 
-const initialNewStaffState: Partial<Omit<StaffRecord, 'fingerprintUrl'>> & { teamId?: string } = {
+const initialNewStaffState: Partial<Omit<StaffRecord, 'fingerprintUrl' | 'cardDisplayData' | 'designSettings'>> & { teamId?: string } = {
     name: '',
     email: '',
     role: 'Employee',
-    teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team',
+    teamId: 'no-team',
     status: 'Invited',
 };
 
@@ -96,15 +92,18 @@ export default function UsersPage() {
   const { toast } = useToast();
 
   const [isAddStaffDialogOpen, setIsAddStaffDialogOpen] = useState(false);
-  const [newStaffForm, setNewStaffForm] = useState<Partial<Omit<StaffRecord, 'fingerprintUrl'>> & { teamId?: string }>(initialNewStaffState);
+  const [newStaffForm, setNewStaffForm] = useState<Partial<Omit<StaffRecord, 'fingerprintUrl' | 'cardDisplayData' | 'designSettings'>> & { teamId?: string }>(initialNewStaffState);
   const [editingStaff, setEditingStaff] = useState<StaffRecord | null>(null);
   const [isDeleteStaffAlertOpen, setIsDeleteStaffAlertOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffRecord | null>(null);
+  
+  const [teamsList, setTeamsList] = useState<Pick<Team, 'id' | 'name'>[]>([]);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
 
   const fetchStaff = useCallback(async () => {
     if (!companyId) {
       if (!authLoading) { 
-        toast({ title: "Error", description: "Company ID not found for admin. Cannot fetch staff.", variant: "destructive" });
+        // toast({ title: "Error", description: "Company ID not found. Cannot fetch staff.", variant: "destructive" });
       }
       setIsLoadingData(false);
       setStaffList([]); 
@@ -135,14 +134,36 @@ export default function UsersPage() {
     }
   }, [companyId, toast, authLoading]);
 
+  const fetchTeamsForSelect = useCallback(async () => {
+    if (!companyId) return;
+    setIsLoadingTeams(true);
+    try {
+      const teamsCollectionRef = collection(db, `companies/${companyId}/teams`);
+      const q = query(teamsCollectionRef);
+      const querySnapshot = await getDocs(q);
+      const fetchedTeams: Pick<Team, 'id' | 'name'>[] = [];
+      querySnapshot.forEach((docSnap) => {
+        fetchedTeams.push({ id: docSnap.id, name: docSnap.data().name });
+      });
+      setTeamsList(fetchedTeams);
+    } catch (error) {
+      console.error("Error fetching teams for select:", error);
+      toast({ title: "Error", description: "Could not fetch teams list for assignment.", variant: "destructive" });
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  }, [companyId, toast]);
+
   useEffect(() => {
     if (!authLoading && companyId) { 
       fetchStaff();
+      fetchTeamsForSelect();
     } else if (!authLoading && !companyId) {
       setStaffList([]);
+      setTeamsList([]);
       setIsLoadingData(false);
     }
-  }, [fetchStaff, authLoading, companyId]);
+  }, [fetchStaff, fetchTeamsForSelect, authLoading, companyId]);
 
   const filteredStaffList = useMemo(() => {
     return staffList.filter(staff =>
@@ -160,16 +181,15 @@ export default function UsersPage() {
         role: staffToEdit.role,
         status: staffToEdit.status,
         teamId: staffToEdit.teamId || 'no-team',
-        // fingerprintUrl is not part of the form for editing
       });
     } else {
       setEditingStaff(null);
-      setNewStaffForm(initialNewStaffState); // fingerprintUrl is auto-generated on save for new staff
+      setNewStaffForm(initialNewStaffState);
     }
     setIsAddStaffDialogOpen(true);
   };
   
-  const handleFormChange = (field: keyof (Partial<Omit<StaffRecord, 'fingerprintUrl'>> & { teamId?: string }), value: string | StaffRole | UserStatus) => {
+  const handleFormChange = (field: keyof (Partial<Omit<StaffRecord, 'fingerprintUrl' | 'cardDisplayData' | 'designSettings'>> & { teamId?: string }), value: string | StaffRole | UserStatus) => {
     setNewStaffForm(prev => ({ ...prev, [field]: value }));
   };
 
@@ -184,33 +204,46 @@ export default function UsersPage() {
       return;
     }
     
-    const staffDataToSave: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount'> = {
+    const staffDataToSaveBase: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount' | 'fingerprintUrl' | 'cardDisplayData' | 'designSettings'> = {
       name: newStaffForm.name,
       email: newStaffForm.email,
       role: newStaffForm.role || 'Employee',
-      teamId: newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId,
       status: editingStaff ? newStaffForm.status || editingStaff.status : 'Invited',
-      fingerprintUrl: '', // This will be set below for new staff, and ignored for updates
     };
+    
+    let dataForFirestore: any = {...staffDataToSaveBase};
+
+    if (newStaffForm.teamId && newStaffForm.teamId !== 'no-team') {
+      dataForFirestore.teamId = newStaffForm.teamId;
+    } else if (editingStaff && newStaffForm.teamId === 'no-team') {
+      dataForFirestore.teamId = deleteField(); // Remove field if "No Team" is selected on edit
+    }
+    // if teamId is undefined (initial add with 'no-team'), it's simply omitted from dataForFirestore
 
     try {
       if (editingStaff) {
         const staffDocRef = doc(db, `companies/${companyId}/staff`, editingStaff.id);
-        // Exclude fingerprintUrl from update payload, it should not change after creation.
-        const { fingerprintUrl: _fpuIgnored, ...dataToUpdate } = staffDataToSave;
-        await updateDoc(staffDocRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
+        await updateDoc(staffDocRef, { ...dataForFirestore, updatedAt: serverTimestamp() });
         toast({ title: "Staff Updated", description: `${newStaffForm.name} has been updated.` });
       } else {
         const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
-        const finalFingerprintUrl = generateUniqueFingerprint(); // Always generate for new staff
-        await addDoc(staffCollectionRef, { 
-          ...staffDataToSave,
+        const finalFingerprintUrl = generateUniqueFingerprint();
+        dataForFirestore = {
+          ...dataForFirestore,
           fingerprintUrl: finalFingerprintUrl, 
+          cardDisplayData: { // Add default card display data
+            ...defaultStaffCardData, 
+            name: newStaffForm.name, 
+            email: newStaffForm.email, 
+            title: newStaffForm.role || 'Employee', // Or a default title
+          },
+          designSettings: defaultCardDesignSettings, // Add default design settings
           cardsCreatedCount: 0,
           lastLoginAt: '-', 
           createdAt: serverTimestamp(), 
           updatedAt: serverTimestamp() 
-        });
+        };
+        await addDoc(staffCollectionRef, dataForFirestore);
         toast({ title: "Staff Added", description: `${newStaffForm.name} has been added.` });
       }
       setIsAddStaffDialogOpen(false);
@@ -244,7 +277,7 @@ export default function UsersPage() {
 
   const getTeamNameById = (teamId?: string) => {
     if (!teamId || teamId === 'no-team') return 'N/A';
-    return MOCK_TEAMS_FOR_SELECT.find(t => t.id === teamId)?.name || 'Unknown Team';
+    return teamsList.find(t => t.id === teamId)?.name || 'Unknown Team';
   };
   
   const getStatusVariant = (status?: UserStatus): "default" | "secondary" | "outline" | "destructive" => {
@@ -282,7 +315,7 @@ export default function UsersPage() {
                 <CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary"/>Staff Management</CardTitle>
                 <CardDescription>Manage staff members in your organization. Assign roles, teams, and manage their digital card access.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenAddStaffDialog()} disabled={!companyId}>
+            <Button onClick={() => handleOpenAddStaffDialog()} disabled={!companyId || isLoadingTeams}>
                 <PlusCircle className="mr-2 h-5 w-5" /> Add New Staff
             </Button>
         </div>
@@ -379,7 +412,7 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>{editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
             <DialogDescription>
-              {editingStaff ? `Update details for ${editingStaff.name}.` : 'Fill in the details below to add a new staff member. The card URL will be auto-generated.'}
+              {editingStaff ? `Update details for ${editingStaff.name}. Card URL segment cannot be changed.` : 'Fill in the details below to add a new staff member. The card URL will be auto-generated.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveStaff}>
@@ -441,6 +474,7 @@ export default function UsersPage() {
                 )}
               <div className="space-y-2">
                 <Label htmlFor="staffTeam">Assign to Team</Label>
+                {isLoadingTeams ? <Skeleton className="h-10 w-full" /> : (
                 <Select
                   value={newStaffForm.teamId || 'no-team'}
                   onValueChange={(value) => handleFormChange('teamId', value)} 
@@ -449,14 +483,14 @@ export default function UsersPage() {
                     <SelectValue placeholder="Select a team" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_TEAMS_FOR_SELECT.map(team => (
+                     <SelectItem value="no-team">No Team (Assign Later)</SelectItem>
+                    {teamsList.map(team => (
                         <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
                     ))}
-                     <SelectItem value="no-team">No Team (Assign Later)</SelectItem>
                   </SelectContent>
                 </Select>
+                )}
               </div>
-              {/* Fingerprint URL input removed */}
             </div>
             <DialogFooter>
               <DialogClose asChild>
