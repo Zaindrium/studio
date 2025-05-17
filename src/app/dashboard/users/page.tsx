@@ -67,7 +67,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { useAuth } from '@/contexts/auth-context';
 
 const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team1', name: 'Sales Team Alpha' },
@@ -79,37 +79,35 @@ const generateUniqueFingerprint = () => {
   return sanitizeForUrl(`staff-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`);
 };
 
-const initialNewStaffState: Partial<StaffRecord> & { teamId?: string } = {
+const initialNewStaffState: Partial<Omit<StaffRecord, 'fingerprintUrl'>> & { teamId?: string } = {
     name: '',
     email: '',
     role: 'Employee',
     teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team',
-    fingerprintUrl: '',
     status: 'Invited',
 };
 
 
 export default function UsersPage() {
-  const { currentUser, loading: authLoading, companyId } = useAuth(); // Use auth context
+  const { currentUser, loading: authLoading, companyId } = useAuth(); 
   const [staffList, setStaffList] = useState<StaffRecord[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   const [isAddStaffDialogOpen, setIsAddStaffDialogOpen] = useState(false);
-  const [newStaffForm, setNewStaffForm] = useState<Partial<StaffRecord> & { teamId?: string }>(initialNewStaffState);
+  const [newStaffForm, setNewStaffForm] = useState<Partial<Omit<StaffRecord, 'fingerprintUrl'>> & { teamId?: string }>(initialNewStaffState);
   const [editingStaff, setEditingStaff] = useState<StaffRecord | null>(null);
   const [isDeleteStaffAlertOpen, setIsDeleteStaffAlertOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffRecord | null>(null);
 
   const fetchStaff = useCallback(async () => {
     if (!companyId) {
-      // companyId might not be available immediately if auth is still loading
-      if (!authLoading) { // Only toast if auth is done loading and companyId is still missing
+      if (!authLoading) { 
         toast({ title: "Error", description: "Company ID not found for admin. Cannot fetch staff.", variant: "destructive" });
       }
       setIsLoadingData(false);
-      setStaffList([]); // Clear list if no companyId
+      setStaffList([]); 
       return;
     }
     setIsLoadingData(true);
@@ -118,7 +116,7 @@ export default function UsersPage() {
       const q = query(staffCollectionRef); 
       const querySnapshot = await getDocs(q);
       const fetchedStaff: StaffRecord[] = [];
-      querySnapshot.forEach((docSnap) => { // Renamed doc to docSnap to avoid conflict
+      querySnapshot.forEach((docSnap) => {
         const data = docSnap.data();
         fetchedStaff.push({ 
           id: docSnap.id, 
@@ -138,10 +136,9 @@ export default function UsersPage() {
   }, [companyId, toast, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && companyId) { // Fetch staff only when auth is resolved and companyId is available
+    if (!authLoading && companyId) { 
       fetchStaff();
     } else if (!authLoading && !companyId) {
-      // Handle case where auth is loaded but no companyId (e.g. new user flow incomplete)
       setStaffList([]);
       setIsLoadingData(false);
     }
@@ -162,17 +159,17 @@ export default function UsersPage() {
         email: staffToEdit.email,
         role: staffToEdit.role,
         status: staffToEdit.status,
-        teamId: staffToEdit.teamId || 'no-team', 
-        fingerprintUrl: staffToEdit.fingerprintUrl,
+        teamId: staffToEdit.teamId || 'no-team',
+        // fingerprintUrl is not part of the form for editing
       });
     } else {
       setEditingStaff(null);
-      setNewStaffForm({...initialNewStaffState, fingerprintUrl: generateUniqueFingerprint() });
+      setNewStaffForm(initialNewStaffState); // fingerprintUrl is auto-generated on save for new staff
     }
     setIsAddStaffDialogOpen(true);
   };
   
-  const handleFormChange = (field: keyof (Partial<StaffRecord> & { teamId?: string }), value: string | StaffRole | UserStatus) => {
+  const handleFormChange = (field: keyof (Partial<Omit<StaffRecord, 'fingerprintUrl'>> & { teamId?: string }), value: string | StaffRole | UserStatus) => {
     setNewStaffForm(prev => ({ ...prev, [field]: value }));
   };
 
@@ -186,35 +183,29 @@ export default function UsersPage() {
       toast({ title: "Error", description: "Company ID not found for admin.", variant: "destructive" });
       return;
     }
-
-    let finalFingerprintUrl = newStaffForm.fingerprintUrl?.trim() || '';
-    if (!editingStaff) { 
-      if (!finalFingerprintUrl) {
-        finalFingerprintUrl = generateUniqueFingerprint();
-      } else {
-        finalFingerprintUrl = sanitizeForUrl(finalFingerprintUrl);
-      }
-    }
     
-    const staffDataToSave = {
+    const staffDataToSave: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount'> = {
       name: newStaffForm.name,
       email: newStaffForm.email,
       role: newStaffForm.role || 'Employee',
       teamId: newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId,
       status: editingStaff ? newStaffForm.status || editingStaff.status : 'Invited',
-      fingerprintUrl: editingStaff ? editingStaff.fingerprintUrl : finalFingerprintUrl, 
+      fingerprintUrl: '', // This will be set below for new staff, and ignored for updates
     };
 
     try {
       if (editingStaff) {
         const staffDocRef = doc(db, `companies/${companyId}/staff`, editingStaff.id);
-        const { fingerprintUrl: _fpu, ...dataToUpdate } = staffDataToSave; // Exclude fingerprintUrl from update
+        // Exclude fingerprintUrl from update payload, it should not change after creation.
+        const { fingerprintUrl: _fpuIgnored, ...dataToUpdate } = staffDataToSave;
         await updateDoc(staffDocRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
         toast({ title: "Staff Updated", description: `${newStaffForm.name} has been updated.` });
       } else {
         const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
+        const finalFingerprintUrl = generateUniqueFingerprint(); // Always generate for new staff
         await addDoc(staffCollectionRef, { 
-          ...staffDataToSave, 
+          ...staffDataToSave,
+          fingerprintUrl: finalFingerprintUrl, 
           cardsCreatedCount: 0,
           lastLoginAt: '-', 
           createdAt: serverTimestamp(), 
@@ -388,7 +379,7 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>{editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
             <DialogDescription>
-              {editingStaff ? `Update details for ${editingStaff.name}.` : 'Fill in the details below to add a new staff member.'}
+              {editingStaff ? `Update details for ${editingStaff.name}.` : 'Fill in the details below to add a new staff member. The card URL will be auto-generated.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveStaff}>
@@ -465,19 +456,7 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="staffFingerprintUrl">Card URL Segment</Label>
-                <Input
-                  id="staffFingerprintUrl"
-                  value={newStaffForm.fingerprintUrl || ''}
-                  onChange={(e) => handleFormChange('fingerprintUrl', sanitizeForUrl(e.target.value))}
-                  placeholder="e.g., alex-johnson (auto-generated if blank)"
-                  disabled={!!editingStaff} 
-                />
-                <p className="text-xs text-muted-foreground">
-                  Unique part of the card URL. {editingStaff ? "Cannot be changed after creation." : "Auto-generated if blank. Will be sanitized."} e.g., /card/{newStaffForm.fingerprintUrl || 'preview'}
-                </p>
-              </div>
+              {/* Fingerprint URL input removed */}
             </div>
             <DialogFooter>
               <DialogClose asChild>
