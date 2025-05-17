@@ -59,24 +59,25 @@ export default function SignupPage() {
 
       // Create Company Profile in Firestore
       // Using user.uid as companyId for simplicity in this admin-first model
-      const companyRef = doc(db, "companies", user.uid); 
+      const companyRef = doc(db, "companies", user.uid);
       const companyProfile: CompanyProfile = {
-        id: user.uid, 
+        id: user.uid,
         name: companyName,
-        createdAt: serverTimestamp(), 
+        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
       await setDoc(companyRef, companyProfile);
 
       // Create Admin User Profile in Firestore (subcollection of company)
+      // Using user.uid as adminId
       const adminRef = doc(db, `companies/${companyProfile.id}/admins`, user.uid);
       const adminProfile: AdminUser = {
-        id: user.uid, 
+        id: user.uid,
         companyId: companyProfile.id,
         name: adminName,
         email: user.email || '',
         emailVerified: user.emailVerified,
-        role: 'Owner', 
+        role: 'Owner',
         status: 'Active', // First admin is active
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -96,7 +97,7 @@ export default function SignupPage() {
           title: "Signup Failed",
           description: "This email address is already in use. Please try logging in or use a different email.",
           variant: "destructive",
-          duration: 7000, 
+          duration: 7000,
         });
       } else if (error.code === 'auth/api-key-not-valid') {
         toast({
@@ -105,7 +106,15 @@ export default function SignupPage() {
           variant: "destructive",
           duration: 9000,
         });
-      } else {
+      } else if (error.code === 'permission-denied' || (error.message && error.message.toLowerCase().includes('permission-denied'))) {
+        toast({
+          title: "Database Permission Error",
+          description: "Could not save company or admin data. Please check your Firestore Security Rules to ensure authenticated users can write to 'companies/{userId}' and 'companies/{userId}/admins/{userId}'.",
+          variant: "destructive",
+          duration: 10000,
+        });
+      }
+       else {
         toast({
           title: "Signup Failed",
           description: error.message || "Could not create your account. Please try again.",
