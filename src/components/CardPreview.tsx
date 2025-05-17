@@ -2,7 +2,7 @@
 "use client";
 
 import React from 'react';
-import type { UserProfile, CardDesignSettings } from '@/lib/types';
+import type { StaffCardData, CardDesignSettings } from '@/lib/app-types'; // Updated type
 import NextImage from 'next/image';
 import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, UserCircle2, Briefcase, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 
 
 interface CardPreviewProps {
-  profile: UserProfile;
+  profile: StaffCardData; // Updated to StaffCardData
   design: CardDesignSettings;
   isPublicView?: boolean;
   onSaveContact?: () => void;
@@ -41,32 +41,24 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
 
   const textPrimaryColorStyle = { color: design.colorScheme.primaryColor };
 
-  // Basic check for dark background colors to improve default text visibility.
   const isLikelyDarkBg = () => {
     const bgColor = design.colorScheme.cardBackground.toLowerCase();
-    // Check for common dark hex codes or very low HSL lightness
     if (bgColor.startsWith('#')) {
       const r = parseInt(bgColor.substring(1, 3), 16);
       const g = parseInt(bgColor.substring(3, 5), 16);
       const b = parseInt(bgColor.substring(5, 7), 16);
-      // A simple brightness formula
       const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-      return brightness < 128; // Threshold for darkness
+      return brightness < 128;
     }
-    // Add HSL check if your colors are in HSL format and you can parse it
-    return false; // Default to not dark if format is unknown
+    return false;
   };
 
   const defaultTextColor = isLikelyDarkBg() ? '#FFFFFF' : '#333333';
-  // If a background image is set (and not a placeholder or data URI), use the design's text color, otherwise default based on bg.
   const textColorToUse = (profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') && !profile.cardBackgroundUrl.startsWith('data:'))
     ? design.colorScheme.textColor
     : defaultTextColor;
 
-  const textColorStyle = {
-    color: textColorToUse
-  };
-
+  const textColorStyle = { color: textColorToUse };
   const textShadow = (profile.cardBackgroundUrl && !profile.cardBackgroundUrl.startsWith('https://placehold.co') && !profile.cardBackgroundUrl.startsWith('data:')) ? { textShadow: '0px 1px 3px rgba(0,0,0,0.6)' } : {};
   const combinedTextStyles = {...textColorStyle, ...textShadow};
 
@@ -81,15 +73,12 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
         "flex flex-col justify-between",
         "bg-cover bg-center",
         "transform transition-all duration-300",
-         // For public view, it's inside a full-screen flex container defined in its page
-         // For editor preview, it has a max height and hover effect
         isPublicView
-          ? "h-full" // Takes full height from parent which is h-screen
+          ? "h-full"
           : "aspect-[9/16] max-h-[750px] hover:scale-[1.02] shadow-2xl"
       )}
       style={{ ...cardBaseStyle, ...cardBackgroundImageStyle }}
     >
-      {/* Top section for Profile Pic, Name, Title */}
       <div className={cn(
         "flex-shrink-0 pt-4",
         design.layout === 'image-top' ? 'flex flex-col items-center text-center' : 'flex flex-row items-center gap-3 sm:gap-4',
@@ -135,10 +124,10 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
           design.layout === 'image-right' ? 'order-1 text-right' : ''
         )}>
           <h2 className={cn("text-xl sm:text-2xl font-bold")} style={{...textPrimaryColorStyle, ...textShadow}}>
-            {profile.name || "Your Name"}
+            {profile.name || "Staff Name"}
           </h2>
           {profile.title && <p className={cn("text-md sm:text-lg")} style={combinedTextStyles}>{profile.title}</p>}
-          {profile.company && <p className={cn("text-sm sm:text-md")} style={combinedTextStyles}><Briefcase className="inline h-3 w-3 mr-1" style={textColorStyle} />{profile.company}</p>}
+          {profile.companyName && <p className={cn("text-sm sm:text-md")} style={combinedTextStyles}><Briefcase className="inline h-3 w-3 mr-1" style={textColorStyle} />{profile.companyName}</p>}
         </div>
       </div>
 
@@ -146,7 +135,6 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
           "my-2 sm:my-3 space-y-1.5 sm:space-y-2 overflow-y-auto px-1 flex-grow",
           design.layout === 'image-right' ? 'items-end flex flex-col' : design.layout === 'image-left' ? 'items-start flex flex-col' : 'items-center flex flex-col text-center'
         )}>
-        {/* Dynamically render contact items */}
         {[
           { key: 'email', icon: Mail, value: profile.email, hrefPrefix: 'mailto:' },
           { key: 'phone', icon: Phone, value: profile.phone, hrefPrefix: 'tel:' },
@@ -176,23 +164,12 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
               </div>
             );
           }
-          // Render a placeholder or nothing if you want all icons to always show
-          // For now, only renders if value exists. To show all icons always:
-          // else {
-          //   const IconComponent = item.icon;
-          //   return (
-          //     <div key={item.key} className="flex items-center gap-2 opacity-50">
-          //       <IconComponent className={cn(iconSmallSize)} style={textPrimaryColorStyle} />
-          //       <span className={cn("text-xs sm:text-sm italic")} style={combinedTextStyles}>Not provided</span>
-          //     </div>
-          //   )
-          // }
           return null;
         })}
 
         {isPublicView && profile.userInfo && (
           <div className="pt-2 mt-2 border-t w-full" style={{borderColor: design.colorScheme.primaryColor + '50'}}>
-            <h3 className="font-semibold text-sm mb-1" style={{...textPrimaryColorStyle, ...textShadow}}>About Me</h3>
+            <h3 className="font-semibold text-sm mb-1" style={{...textPrimaryColorStyle, ...textShadow}}>About Staff</h3>
             <p className={cn("text-xs whitespace-pre-wrap break-words")} style={combinedTextStyles}>{profile.userInfo}</p>
           </div>
         )}
@@ -203,7 +180,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
            <Button
             onClick={onSaveContact}
             className="w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors"
-            style={{backgroundColor: design.colorScheme.primaryColor, color: design.colorScheme.cardBackground /* Contrast with button bg */}}
+            style={{backgroundColor: design.colorScheme.primaryColor, color: design.colorScheme.cardBackground }}
            >
             <Download className="mr-2 h-4 w-4" />
             Save Contact
@@ -214,7 +191,6 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
   );
 
   if (isPublicView) {
-    // The parent container in page.tsx will handle full screen display
     return (
         <div className="w-full h-full flex items-center justify-center">
             {cardContentActual}
@@ -222,10 +198,9 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
     );
   }
 
-  // Editor Preview
   return (
     <div className={cn("shadow-xl w-full overflow-hidden sticky top-6")}>
-        <div className="text-2xl text-center p-4 font-semibold">Card Preview</div>
+        <div className="text-2xl text-center p-4 font-semibold">Card Editor Preview</div>
       <div className={cn("flex flex-col items-center justify-center p-4")}>
         {cardContentActual}
       </div>

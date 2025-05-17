@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useState, memo } from 'react'; // Added memo
-import type { UserProfile, CardDesignSettings } from '@/lib/types';
+import React, { useState, memo } from 'react';
+import type { StaffCardData, CardDesignSettings } from '@/lib/app-types'; // Updated type
 import { proposeCardEnhancements, ProposeCardEnhancementsInput, ProposeCardEnhancementsOutput } from '@/ai/flows/propose-card-enhancements';
 import { generateCardBackground, GenerateCardBackgroundInput, GenerateCardBackgroundOutput } from '@/ai/flows/generate-card-background-flow';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface AiDesignAssistantProps {
-  userProfile: UserProfile;
+  userProfile: StaffCardData; // Updated to StaffCardData
   currentDesign: CardDesignSettings;
   onApplySuggestions: (updatedDesign: Partial<CardDesignSettings>) => void;
-  onUpdateProfileForAI: (aiRelatedProfileData: Partial<UserProfile>) => void;
+  onUpdateProfileForAI: (aiRelatedProfileData: Partial<StaffCardData>) => void; // Updated type
 }
 
 const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggestions, onUpdateProfileForAI }: AiDesignAssistantProps) => {
@@ -29,7 +29,7 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
     if (!userProfile.name?.trim() && !userProfile.title?.trim() && !userProfile.email?.trim()) {
       toast({
         title: "More Info Needed",
-        description: "Please fill in at least your Name, Title, or Email in your profile for the AI to generate meaningful suggestions.",
+        description: "Please fill in at least Name, Title, or Email in the staff card details for the AI to generate meaningful suggestions.",
         variant: "destructive",
       });
       return;
@@ -37,10 +37,11 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
     setIsLoadingSuggestions(true);
     setSuggestions(null);
     try {
+      // Map StaffCardData to ProposeCardEnhancementsInput
       const input: ProposeCardEnhancementsInput = {
         name: userProfile.name,
         title: userProfile.title,
-        company: userProfile.company,
+        company: userProfile.companyName, // Map companyName
         phone: userProfile.phone,
         email: userProfile.email,
         website: userProfile.website,
@@ -57,7 +58,7 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
       setSuggestions(result);
       toast({
         title: "AI Enhancements Ready!",
-        description: "Check out the ideas below to improve your card.",
+        description: "Check out the ideas below to improve the card.",
       });
     } catch (error) {
       console.error("AI enhancement error:", error);
@@ -104,7 +105,7 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
 
     toast({
       title: "Enhancements Applied!",
-      description: "Card design and 'About Me' updated with AI recommendations.",
+      description: "Card design and 'About Staff' updated with AI recommendations.",
     });
   };
 
@@ -122,7 +123,7 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
       const result = await generateCardBackground(input);
       if (result.imageDataUri) {
         onUpdateProfileForAI({ cardBackgroundUrl: result.imageDataUri });
-        toast({ title: "AI Background Generated!", description: "New background image applied to your card." });
+        toast({ title: "AI Background Generated!", description: "New background image applied to the card." });
       } else {
         throw new Error("AI did not return image data.");
       }
@@ -140,7 +141,7 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
       <CardHeader>
         <CardTitle className="flex items-center text-2xl"><Sparkles className="mr-2 h-6 w-6 text-primary" />AI Card Enhancer</CardTitle>
         <CardDescription>
-          Get AI-powered suggestions for your card's content, layout, colors, and even generate a background image!
+          Get AI-powered suggestions for the card's content, layout, colors, and even generate a background image!
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -148,14 +149,14 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
           <Lightbulb className="h-4 w-4" />
           <AlertTitle>How it works</AlertTitle>
           <AlertDescription>
-            The AI uses your entire profile (including links for context if possible) to generate holistic suggestions. Ensure your profile details are up-to-date! LinkedIn profile pictures cannot be fetched automatically; please upload yours manually.
-            Your "About Me" (Profession, Interests) and "Target Audience" fields below greatly help the AI.
+            The AI uses the staff card details (including links for context if possible) to generate holistic suggestions.
+            "Staff Info" and "Target Audience" fields below greatly help the AI.
           </AlertDescription>
         </Alert>
         
         <div className="p-3 border rounded-md bg-secondary/20 space-y-2">
             <Label className="font-medium text-sm">Current Info for AI:</Label>
-            <p className="text-xs"><strong>Your Info:</strong> {userProfile.userInfo || <span className="italic text-muted-foreground">Not set in profile</span>}</p>
+            <p className="text-xs"><strong>Staff Info:</strong> {userProfile.userInfo || <span className="italic text-muted-foreground">Not set in profile</span>}</p>
             <p className="text-xs"><strong>Target Audience:</strong> {userProfile.targetAudience || <span className="italic text-muted-foreground">Not set in profile</span>}</p>
         </div>
 
@@ -171,7 +172,7 @@ const AiDesignAssistantComponent = ({ userProfile, currentDesign, onApplySuggest
             
             {suggestions.suggestedAboutMe && (
               <div>
-                <Label className="font-medium text-base">Suggested "About Me":</Label>
+                <Label className="font-medium text-base">Suggested "About Staff":</Label>
                 <p className="text-sm p-3 bg-background rounded-md whitespace-pre-wrap">{suggestions.suggestedAboutMe}</p>
               </div>
             )}

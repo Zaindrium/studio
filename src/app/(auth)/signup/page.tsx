@@ -2,35 +2,31 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from 'next/link';
 import { UserPlus, Mail, Key, Building, UserCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast'; // Import useToast
-
-type AccountType = "personal" | "business";
+import { useToast } from '@/hooks/use-toast';
 
 export default function SignupPage() {
-  const router = useRouter(); // Initialize useRouter
-  const { toast } = useToast(); // Initialize useToast
-  const [accountType, setAccountType] = useState<AccountType>("personal");
+  const router = useRouter();
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [adminName, setAdminName] = useState('');
+  const [adminName, setAdminName] = useState(''); // Admin's full name
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
     toast({
-      title: "Creating Account...",
-      description: "Please wait while we set up your account.",
+      title: "Creating Company Account...",
+      description: "Please wait while we set up your company and admin account.",
     });
 
     if (password !== confirmPassword) {
@@ -43,104 +39,76 @@ export default function SignupPage() {
       return;
     }
 
-    // Placeholder for actual signup logic
-    console.log("Signup attempt with:", { accountType, email, password, companyName, adminName });
+    if (!adminName.trim() || !companyName.trim()) {
+        toast({
+            title: "Missing Information",
+            description: "Please provide your name and company name.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
+
+    // Placeholder for actual signup logic (creating company, admin user in Firebase)
+    console.log("Admin & Company Signup attempt with:", { adminName, email, password, companyName });
     await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
 
-    // SIMULATED SUCCESS & REDIRECTION LOGIC
-    // In a real app, this would involve creating a user in the DB,
-    // sending a verification email, etc.
-    if (accountType === "personal") {
-      toast({
-        title: "Account Created!",
-        description: "Welcome! Redirecting to the Card Editor...",
-        variant: "default",
-      });
-      router.push('/editor');
-    } else { // business account
-      toast({
-        title: "Business Account Created!",
-        description: "Welcome! Redirecting to your Business Dashboard...",
-        // In a real app, you might redirect to /subscription or a verification step.
-        variant: "default",
-      });
-      router.push('/dashboard');
-    }
-    // In a real error scenario:
-    // toast({ title: "Signup Failed", description: "Could not create account. Please try again.", variant: "destructive" });
-    // setIsLoading(false);
+    toast({
+      title: "Company Account Created!",
+      description: `Welcome, ${adminName}! Redirecting to your Business Dashboard...`,
+      variant: "default",
+    });
+    router.push('/dashboard'); // Redirect to dashboard after admin/company setup
+    // In a real app, might redirect to subscription or email verification.
   };
 
   return (
     <Card className="w-full">
       <CardHeader className="space-y-1 text-center">
         <CardTitle className="text-2xl flex items-center justify-center">
-          <UserPlus className="mr-2 h-6 w-6 text-primary" /> Create Your LinkUP Account
+          <UserPlus className="mr-2 h-6 w-6 text-primary" /> Create Company Account
         </CardTitle>
         <CardDescription>
-          Join LinkUP to start creating and sharing digital cards.
+          Set up your company and create the primary administrator account for LinkUP.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label className="flex items-center">Account Type</Label>
-            <RadioGroup
-              defaultValue="personal"
-              onValueChange={(value) => setAccountType(value as AccountType)}
-              className="flex space-x-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="personal" id="personal" />
-                <Label htmlFor="personal">Personal</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="business" id="business" />
-                <Label htmlFor="business">Business</Label>
-              </div>
-            </RadioGroup>
+            <Label htmlFor="companyName" className="flex items-center"><Building className="mr-2 h-4 w-4 text-primary"/>Company Name</Label>
+            <Input
+              id="companyName"
+              type="text"
+              placeholder="Your Company Inc."
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required
+            />
           </div>
-
-          {accountType === 'business' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="companyName" className="flex items-center"><Building className="mr-2 h-4 w-4 text-primary"/>Company Name</Label>
-                <Input
-                  id="companyName"
-                  type="text"
-                  placeholder="Your Company Inc."
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  required={accountType === 'business'}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="adminName" className="flex items-center"><UserCircle className="mr-2 h-4 w-4 text-primary"/>Your Name (Admin)</Label>
-                <Input
-                  id="adminName"
-                  type="text"
-                  placeholder="Admin Full Name"
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  required={accountType === 'business'}
-                />
-              </div>
-            </>
-          )}
-
           <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary"/>Email</Label>
+            <Label htmlFor="adminName" className="flex items-center"><UserCircle className="mr-2 h-4 w-4 text-primary"/>Your Full Name (Admin)</Label>
+            <Input
+              id="adminName"
+              type="text"
+              placeholder="Admin Full Name"
+              value={adminName}
+              onChange={(e) => setAdminName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary"/>Admin Email</Label>
             <Input
               id="email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="you@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Password</Label>
+            <Label htmlFor="password" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Admin Password</Label>
             <Input
               id="password"
               type="password"
@@ -151,7 +119,7 @@ export default function SignupPage() {
             />
           </div>
            <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Confirm Password</Label>
+            <Label htmlFor="confirmPassword" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Confirm Admin Password</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -164,10 +132,10 @@ export default function SignupPage() {
         </CardContent>
         <CardFooter className="flex flex-col space-y-3">
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Creating Account...' : 'Sign Up'}
+            {isLoading ? 'Creating Account...' : 'Create Company & Admin Account'}
           </Button>
           <p className="text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Already have an admin account?{' '}
             <Link href="/login" className="font-medium text-primary hover:underline">
               Log In
             </Link>

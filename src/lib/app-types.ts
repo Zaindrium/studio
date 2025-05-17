@@ -2,10 +2,11 @@
 // Renaming types.ts to app-types.ts to avoid conflict with native TS types
 // And to specifically denote application-level type definitions.
 
-export interface UserProfile { // This is for the card editor, not directly for dashboard users
+// Data displayed ON a staff member's card
+export interface StaffCardData {
   name: string;
   title: string;
-  company: string;
+  companyName?: string; // Company name on the card, might differ from the managing Company's name
   phone: string;
   email: string;
   website: string;
@@ -15,8 +16,8 @@ export interface UserProfile { // This is for the card editor, not directly for 
   address: string;
   profilePictureUrl?: string;
   cardBackgroundUrl?: string;
-  userInfo?: string; 
-  targetAudience?: string;
+  userInfo?: string;
+  targetAudience?: string; // May or may not be relevant for admin-managed cards
 }
 
 export interface CardDesignSettings {
@@ -27,161 +28,121 @@ export interface CardDesignSettings {
     textColor: string;
     primaryColor: string;
   };
-  qrCodeUrl: string;
+  qrCodeUrl: string; // This will be the unique fingerprint URL for the staff card
 }
 
-export interface OrganizationProfile {
-  id: string;
+// Represents an Organization/Company in Firebase
+export interface CompanyProfile {
+  id: string; // companyId
   name: string;
   industry?: string;
-  size?: string; 
+  size?: string;
   website?: string;
   address?: string;
-  subscriptionPlanId: string;
-  subscriptionStatus: 'active' | 'inactive' | 'trial';
-  createdAt: string; // Using string for mock data simplicity, Date in real app
-  updatedAt: string; // Using string for mock data simplicity, Date in real app
+  // branding: logoUrl, primaryColor, etc.
+  // subscriptionPlanId: string; (Covered by useCurrentPlan for now)
+  // subscriptionStatus: 'active' | 'inactive' | 'trial';
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface Team {
-  id: string;
-  organizationId?: string; // Optional, for mock data simplicity
-  name: string;
-  description: string;
-  memberUserIds?: string[]; // Simplified for now
-  manager: string; // Simplified for mock data
-  memberCount: number; // For display on teams page
-  defaultTemplateId?: string; 
-  createdAt?: string; 
-  updatedAt?: string; 
-}
+// Represents an Admin User in Firebase
+export type AdminRole = 'Owner' | 'Admin' | 'BillingManager'; // Example roles
+export type UserStatus = 'Active' | 'Invited' | 'Inactive'; // Re-using for admins too
 
-export type UserRole = 'Admin' | 'Manager' | 'Employee';
-export type UserStatus = 'Active' | 'Invited' | 'Inactive';
-
-export interface AuthenticatedUser { // This type will be used for the dashboard user list
-  id: string;
-  organizationId?: string; 
-  teamId?: string;        
+export interface AdminUser { // Was AuthenticatedUser
+  id: string; // adminId
+  companyId: string;
   name: string;
   email: string;
   emailVerified?: boolean;
-  role: UserRole;
+  role: AdminRole; // Specific admin roles
   status: UserStatus;
-  profilePictureUrl?: string; 
-  title?: string; 
-  phone?: string; 
-  accessCode?: string; 
-  accessCodeUsed?: boolean;
-  onboardingCompleted?: boolean;
-  lastLoginAt?: string; // Using string for mock data, Date in real app
-  cardsCreatedCount?: number; // Example metric
-  createdAt: string; 
+  profilePictureUrl?: string;
+  lastLoginAt?: string;
+  createdAt: string;
   updatedAt?: string;
 }
 
-export interface BusinessCardData {
-  id: string;
-  userId: string; 
-  organizationId?: string; 
-  teamId?: string; 
-  
+// Represents a Staff Record in Firebase (managed by Admins, no login)
+export interface StaffRecord {
+  id: string; // staffId
+  companyId: string;
   name: string;
-  title: string;
-  company?: string; 
-  phone?: string;
-  email: string;
-  website?: string;
-  linkedin?: string;
-  twitter?: string;
-  github?: string;
-  address?: string;
-  profilePictureUrl?: string;
-  cardBackgroundUrl?: string;
-  userInfo?: string; 
-  
-  designSettings: CardDesignSettings; 
-
-  viewCount?: number;
-  scanCount?: number;
-  shareCount?: number;
-
-  isPublic?: boolean;
-  publicUrlSlug?: string;
-
-  createdAt: string; 
-  updatedAt?: string; 
+  email: string; // For contact, not login
+  title?: string;
+  team?: string; // Team name or ID
+  status: 'Active' | 'Inactive'; // Card activation status
+  uniqueNfcIdentifier?: string; // For linking to a physical NFC tag
+  fingerprintUrl: string; // e.g., {businessName}/{uniqueStaffId}/{staffInitials}
+  assignedCardId?: string; // Reference to the DigitalBusinessCardRecord
+  createdAt: string;
+  updatedAt: string;
 }
 
+// Represents a Digital Business Card record in Firebase
+export interface DigitalBusinessCardRecord {
+  id: string; // cardId
+  companyId: string;
+  staffRecordId: string; // Link to StaffRecord
+  templateId?: string; // Link to CardTemplateRecord
+  customFields?: Record<string, any>; // For any overrides or additional card-specific data
+  cardData: StaffCardData; // The actual content to display on the card
+  designSettings: CardDesignSettings; // The design to apply
+  isActive: boolean; // Master switch for the card
+  nfcTagId?: string; // Physical NFC tag identifier if linked
+  createdAt: string;
+  updatedAt: string;
+}
 
-export interface CardTemplate {
-  id: string;
-  organizationId?: string; 
+// Represents a Card Template record in Firebase
+export interface CardTemplateRecord {
+  id: string; // templateId
+  companyId: string;
   name: string;
   description?: string;
-  designSettings: CardDesignSettings; 
-  isDefault?: boolean; 
-  createdAt: string; 
-  updatedAt?: string;
+  designSettings: CardDesignSettings; // Base design
+  defaultFields?: Partial<StaffCardData>; // Pre-filled fields for cards using this template
+  isDefault?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface AccessCode {
-    code: string; 
-    userId: string; 
-    organizationId: string;
+
+export interface AccessCode { // For inviting new Admins or other purposes
+    code: string;
+    userId: string; // Could be adminId
+    companyId: string;
     isUsed: boolean;
     expiresAt?: string;
     createdAt: string;
 }
 
-
-export interface DashboardAnalytics {
-  totalCardViews: number;
-  weeklyCardViews: number;
-  totalScans: number;
-  weeklyScans: number;
-  totalShares: number;
-  weeklyShares: number;
-  totalCards: number;
-  totalUsers: number;
-  planUsagePercent: number;
-}
-
-// Keep original AppTemplate for editor page if still used
+// Mock data for editor page, now using StaffCardData
 export interface AppTemplate {
   id: string;
   name: string;
   description: string;
-  profile: UserProfile; // This UserProfile is for the card editor
+  profile: StaffCardData; // Changed from UserProfile
   design: CardDesignSettings;
 }
 
-export interface ContactInfo {
-  id: string; // Unique ID for the contact
-  name: string;
-  email: string;
-  phone?: string;
-  company?: string;
-  message?: string;
-  submittedFromCardId?: string; // Which card's URL they submitted from
-  submittedAt: string; // ISO date string
-}
 
-const defaultClassicProfile: UserProfile = {
-  name: 'Jane Doe',
-  title: 'Software Engineer',
-  company: 'Tech Solutions Inc.',
+// --- Mock Data for App ---
+const defaultClassicStaffCard: StaffCardData = {
+  name: 'Jane Doe (Staff)',
+  title: 'Sales Representative',
+  companyName: 'Example Corp',
   phone: '+1234567890',
-  email: 'jane.doe@example.com',
-  website: 'https://example.com',
-  linkedin: 'linkedin.com/in/janedoe',
-  twitter: 'twitter.com/janedoe',
-  github: 'github.com/janedoe',
-  address: '123 Main St, Anytown, USA',
+  email: 'jane.staff@example.com',
+  website: 'https://example.com/jane',
+  linkedin: 'linkedin.com/in/janestaff',
+  twitter: '@janestaff',
+  github: '',
+  address: '123 Business Rd, Suite 100',
   profilePictureUrl: `https://placehold.co/100x100.png`,
-  cardBackgroundUrl: `https://placehold.co/600x900.png` , 
-  userInfo: 'A software engineer passionate about web development and open source.',
-  targetAudience: 'Tech recruiters, potential clients, and collaborators in the software industry.',
+  cardBackgroundUrl: ``,
+  userInfo: 'Dedicated sales professional helping businesses grow.',
 };
 
 const defaultClassicDesign: CardDesignSettings = {
@@ -190,91 +151,96 @@ const defaultClassicDesign: CardDesignSettings = {
   colorScheme: {
     cardBackground: '#FFFFFF',
     textColor: '#333333',
-    primaryColor: '#3F51B5', 
+    primaryColor: '#3F51B5',
   },
-  qrCodeUrl: '/card/classic-default',
+  qrCodeUrl: '/card/classic-default-staff', // Needs to be unique per card
 };
 
-const creativeProfessionalProfile: UserProfile = {
-  name: 'Alex Creative',
-  title: 'Photographer & Designer',
-  company: 'Pixel Perfect Studios',
-  phone: '+1-555-CREATIVE',
-  email: 'alex@pixelperfect.art',
-  website: 'https://pixelperfect.art',
-  linkedin: 'linkedin.com/in/alexcreative',
-  twitter: '@alexcreative',
+const creativeProfessionalStaffCard: StaffCardData = {
+  name: 'Alex Creative (Staff)',
+  title: 'Marketing Specialist',
+  companyName: 'Example Corp Marketing',
+  phone: '+1-555-DESIGN',
+  email: 'alex.creative@example.com',
+  website: 'https://example.com/marketing',
+  linkedin: 'linkedin.com/in/alexcreativemarketing',
+  twitter: '@creativealex',
   github: '',
-  address: '789 Art Block, Design District',
-  profilePictureUrl: `https://placehold.co/120x120.png` , 
-  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
-  userInfo: 'Visual storyteller specializing in portrait photography and branding design. Loves vibrant colors and bold statements.',
-  targetAudience: 'Art directors, gallery owners, individuals seeking creative visual services.',
+  address: '456 Art Avenue, Creative City',
+  profilePictureUrl: `https://placehold.co/120x120.png`,
+  cardBackgroundUrl: ``,
+  userInfo: 'Innovative marketing specialist driving brand engagement.',
 };
 
 const creativeProfessionalDesign: CardDesignSettings = {
   template: 'modern',
   layout: 'image-top',
   colorScheme: {
-    cardBackground: '#F8F8F8', 
-    textColor: '#2C3E50',    
-    primaryColor: '#E74C3C', 
+    cardBackground: '#F8F8F8',
+    textColor: '#2C3E50',
+    primaryColor: '#E74C3C',
   },
-  qrCodeUrl: '/card/alex-creative',
-};
-
-const corporateExecutiveProfile: UserProfile = {
-  name: 'Dr. Evelyn Reed',
-  title: 'CEO & Strategic Consultant',
-  company: 'Global Strategy Partners',
-  phone: '+1-800-EXECUTIVE',
-  email: 'e.reed@globalstrategy.com',
-  website: 'https://globalstrategy.com',
-  linkedin: 'linkedin.com/in/evelynreedceo',
-  twitter: '',
-  github: '',
-  address: '1 Business Bay, Financial Center',
-  profilePictureUrl: `https://placehold.co/100x100.png`,
-  cardBackgroundUrl: `https://placehold.co/600x900.png`, 
-  userInfo: 'Experienced CEO with a track record in business transformation and market growth. Focus on data-driven strategies.',
-  targetAudience: 'Investors, board members, C-suite executives, industry leaders.',
-};
-
-const corporateExecutiveDesign: CardDesignSettings = {
-  template: 'minimalist',
-  layout: 'image-right',
-  colorScheme: {
-    cardBackground: '#0A2342', 
-    textColor: '#EAEAEA',    
-    primaryColor: '#A9BCD0', 
-  },
-  qrCodeUrl: '/card/evelyn-reed',
+  qrCodeUrl: '/card/alex-creative-staff',
 };
 
 export const appTemplates: AppTemplate[] = [
   {
-    id: 'classic-default',
-    name: 'Classic Default',
-    description: 'A balanced and professional starting point.',
-    profile: defaultClassicProfile,
+    id: 'classic-default-staff',
+    name: 'Staff Classic Default',
+    description: 'A balanced and professional starting point for staff cards.',
+    profile: defaultClassicStaffCard,
     design: defaultClassicDesign,
   },
   {
-    id: 'creative-pro',
-    name: 'Creative Professional',
-    description: 'Bold and visual, perfect for artists and designers.',
-    profile: creativeProfessionalProfile,
+    id: 'creative-pro-staff',
+    name: 'Staff Creative Professional',
+    description: 'Bold and visual, perfect for creative staff members.',
+    profile: creativeProfessionalStaffCard,
     design: creativeProfessionalDesign,
-  },
-  {
-    id: 'corporate-exec',
-    name: 'Corporate Executive',
-    description: 'Sleek and authoritative for business leaders.',
-    profile: corporateExecutiveProfile,
-    design: corporateExecutiveDesign,
   },
 ];
 
-
-export const defaultUserProfile: UserProfile = defaultClassicProfile;
+export const defaultStaffCardData: StaffCardData = defaultClassicStaffCard;
 export const defaultCardDesignSettings: CardDesignSettings = defaultClassicDesign;
+
+
+// For Dashboard User/Admin list display
+// Re-using UserRole and UserStatus for general user display, though AdminUser has AdminRole
+export type UserRole = 'Admin' | 'Manager' | 'Employee'; // General purpose for display in dashboard lists
+
+export interface AuthenticatedUser { // This type is used for the dashboard *logged-in admin's* mock data.
+  id: string;
+  companyId: string; // Company this admin belongs to
+  organizationName: string; // Company name for display
+  name: string;
+  email: string;
+  role: AdminRole; // Specific admin role
+  avatarUrl?: string;
+  // Other fields from AdminUser can be added as needed for the dashboard's display of the logged-in user.
+}
+
+// For Dashboard Teams list
+export interface Team {
+  id: string;
+  organizationId?: string;
+  name: string;
+  description: string;
+  memberUserIds?: string[];
+  manager: string; // Name of the manager
+  memberCount: number;
+  defaultTemplateId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// For Contact Collection on Public Card
+export interface ContactInfo {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  message?: string;
+  submittedFromCardId?: string;
+  submittedAt: string;
+}

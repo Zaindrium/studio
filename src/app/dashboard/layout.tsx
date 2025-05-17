@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react'; // Added useEffect and useState
+import React, { useEffect, useState } from 'react';
 import '../globals.css';
-import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock } from 'lucide-react'; // Added Lock
+import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock } from 'lucide-react';
 import {
   Sidebar,
   SidebarProvider,
@@ -19,32 +19,38 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan'; // Import useCurrentPlan
+import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
+import type { AdminUser } from '@/lib/app-types'; // Updated to AdminUser
 
-// Simulated user data - replace with actual auth context later
-const MOCK_USER = {
-  name: "Admin User",
-  email: "admin@example.com",
+// Simulated admin user data - replace with actual auth context later
+const MOCK_ADMIN_USER: AdminUser & { organizationName: string, avatarUrl?: string } = { // Extended for display
+  id: "admin-user-123",
+  companyId: "company-abc-789",
+  organizationName: "Example Corp", // This comes from the CompanyProfile linked to the admin
+  name: "Admin LoggedIn",
+  email: "admin@examplecorp.com",
+  role: 'Owner', // Example admin role
+  status: 'Active',
   avatarUrl: "https://placehold.co/40x40.png",
-  organizationName: "LinkUP Corp" // This will be used for white-labeling
+  createdAt: new Date().toISOString(),
 };
 
 const sidebarNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/teams', label: 'Teams', icon: Users, isPremium: true },
-  { href: '/dashboard/users', label: 'Users', icon: UserCog },
-  { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard },
+  { href: '/dashboard/users', label: 'Users', icon: UserCog }, // Managing staff/users
+  { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard }, // Admin manages staff cards
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
   { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true },
   { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true },
+  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true }, // Managing other admins
   { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true },
   { href: '/dashboard/license', label: 'License Management', icon: CreditCard },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings }, // Company/Org settings
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
 ];
 
@@ -55,7 +61,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const user = MOCK_USER;
+  const adminUser = MOCK_ADMIN_USER; // Use the mock admin user
   const { currentPlan, isLoading: isPlanLoading } = useCurrentPlan();
   const [activePlan, setActivePlan] = useState<PlanId | null>(null);
 
@@ -66,8 +72,9 @@ export default function DashboardLayout({
   }, [currentPlan, isPlanLoading]);
 
   const handleLogout = () => {
-    // Add actual logout logic here (e.g., clear tokens, call API)
     console.log("Logout clicked, redirecting to /login");
+    // Add actual logout logic here (e.g., clear tokens, call API)
+    // For now, just redirect
     router.push('/login');
   };
 
@@ -78,8 +85,7 @@ export default function DashboardLayout({
           <SidebarHeader className="p-4 flex items-center space-x-3">
               <Link href="/dashboard" className="flex items-center no-underline hover:opacity-90">
                 <LinkIcon className="h-7 w-7 text-primary" />
-                {/* Use organizationName for white-labeling */}
-                <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">{user.organizationName}</span>
+                <span className="ml-2 text-xl font-semibold text-primary group-data-[collapsible=icon]:hidden">{adminUser.organizationName}</span>
               </Link>
           </SidebarHeader>
           <SidebarContent className="p-2">
@@ -102,7 +108,7 @@ export default function DashboardLayout({
                         className={isPremiumLocked ? 'opacity-60 cursor-not-allowed hover:bg-transparent hover:text-sidebar-foreground' : ''}
                         onClick={isPremiumLocked ? (e) => {
                             e.preventDefault();
-                            router.push('/dashboard/license');
+                            router.push('/dashboard/license'); // Or /subscription
                         } : undefined}
                       >
                         <item.icon className="h-5 w-5" />
@@ -122,12 +128,12 @@ export default function DashboardLayout({
             <Link href="/dashboard/settings" className="block hover:bg-sidebar-accent/50 p-2 rounded-md -m-2 transition-colors">
               <div className="flex items-center space-x-3 group-data-[collapsible=icon]:justify-center">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="person avatar"/>
-                  <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={adminUser.avatarUrl} alt={adminUser.name} data-ai-hint="person avatar"/>
+                  <AvatarFallback>{adminUser.name.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="group-data-[collapsible=icon]:hidden">
-                  <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">{user.organizationName}</p>
+                  <p className="text-sm font-medium">{adminUser.name}</p>
+                  <p className="text-xs text-muted-foreground">{adminUser.organizationName}</p>
                 </div>
               </div>
             </Link>

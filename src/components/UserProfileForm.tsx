@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { UserProfile } from '@/lib/types';
+import type { StaffCardData } from '@/lib/app-types'; // Updated to StaffCardData
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -19,12 +19,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2 } from 'lucide-react';
-import React, { useRef, memo } from 'react'; // Added memo
+import React, { useRef, memo } from 'react';
 
-const profileSchema = z.object({
+// Schema reflects fields for StaffCardData
+const staffCardSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
-  company: z.string().optional(),
+  companyName: z.string().optional(), // Changed from company
   phone: z.string().optional(),
   email: z.string().email({ message: 'Invalid email address.' }),
   website: z.string().url({ message: 'Invalid URL.' }).optional().or(z.literal('')),
@@ -32,48 +33,42 @@ const profileSchema = z.object({
   twitter: z.string().optional(),
   github: z.string().optional(),
   address: z.string().optional(),
-  profilePictureUrl: z.string().optional().or(z.literal('')), 
-  cardBackgroundUrl: z.string().optional().or(z.literal('')), 
-  userInfo: z.string().optional().describe('Information about the user, including their profession and interests for AI assistant.'),
+  profilePictureUrl: z.string().optional().or(z.literal('')),
+  cardBackgroundUrl: z.string().optional().or(z.literal('')),
+  userInfo: z.string().optional().describe('Information about the user for AI assistant.'),
   targetAudience: z.string().optional().describe('The target audience for the business card for AI assistant.'),
 });
 
-type ProfileFormValues = z.infer<typeof profileSchema>;
+type StaffCardFormValues = z.infer<typeof staffCardSchema>;
 
 interface UserProfileFormProps {
-  profile: UserProfile;
-  onProfileChange: (data: Partial<UserProfile>) => void;
+  profile: StaffCardData; // Updated to StaffCardData
+  onProfileChange: (data: Partial<StaffCardData>) => void; // Updated to StaffCardData
 }
 
-// Form component is memoized using React.memo to prevent unnecessary re-renders
-// if its props (profile, onProfileChange) do not change shallowly.
-// The onProfileChange callback should ideally be memoized using useCallback in the parent component.
 const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormProps) => {
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
+  const form = useForm<StaffCardFormValues>({
+    resolver: zodResolver(staffCardSchema),
     defaultValues: profile,
   });
 
   const profilePictureInputRef = useRef<HTMLInputElement>(null);
   const cardBackgroundInputRef = useRef<HTMLInputElement>(null);
 
-  // Effect to reset the form if the profile prop changes from outside
   React.useEffect(() => {
     form.reset(profile);
   }, [profile, form]);
 
-  // Effect to subscribe to form value changes and call onProfileChange.
-  // This makes the form "inline editable" - changes are propagated upwards as they happen.
   React.useEffect(() => {
     const subscription = form.watch((value) => {
-      onProfileChange(value as Partial<UserProfile>);
+      onProfileChange(value as Partial<StaffCardData>); // Updated to StaffCardData
     });
     return () => subscription.unsubscribe();
   }, [form, onProfileChange]);
 
   const handleFileChange = (
     event: React.ChangeEvent<HTMLInputElement>,
-    fieldName: keyof ProfileFormValues
+    fieldName: keyof StaffCardFormValues
   ) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -88,7 +83,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center text-2xl"><User className="mr-2 h-6 w-6 text-primary" /> Your Profile</CardTitle>
+        <CardTitle className="flex items-center text-2xl"><User className="mr-2 h-6 w-6 text-primary" /> Staff Card Details</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -122,10 +117,10 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
               />
               <FormField
                 control={form.control}
-                name="company"
+                name="companyName" // Changed from company
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center"><Briefcase className="mr-2 h-4 w-4" />Company (Optional)</FormLabel>
+                    <FormLabel className="flex items-center"><Briefcase className="mr-2 h-4 w-4" />Company Name (on card, Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Innovatech" {...field} />
                     </FormControl>
@@ -254,8 +249,8 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                     </>
                   </FormControl>
                   <FormDescription>
-                    {form.watch('profilePictureUrl') && typeof form.watch('profilePictureUrl') === 'string' && !form.watch('profilePictureUrl').startsWith('data:') ? 
-                    `Current URL: ${form.watch('profilePictureUrl')}` : 
+                    {form.watch('profilePictureUrl') && typeof form.watch('profilePictureUrl') === 'string' && !form.watch('profilePictureUrl').startsWith('data:') ?
+                    `Current URL: ${form.watch('profilePictureUrl')}` :
                     form.watch('profilePictureUrl') ? 'New photo selected.' : 'No photo selected.'}
                      Ideal aspect ratio: 1:1.
                   </FormDescription>
@@ -304,15 +299,15 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                   </FormControl>
                   <FormDescription>
                     {form.watch('cardBackgroundUrl') && typeof form.watch('cardBackgroundUrl') === 'string' && !form.watch('cardBackgroundUrl').startsWith('data:') ?
-                     `Current URL: ${form.watch('cardBackgroundUrl')}` : 
-                     form.watch('cardBackgroundUrl') ? 'New background selected.' : 'No background selected.'} 
+                     `Current URL: ${form.watch('cardBackgroundUrl')}` :
+                     form.watch('cardBackgroundUrl') ? 'New background selected.' : 'No background selected.'}
                      Ideal aspect ratio: 9:16 (portrait).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <div className="pt-4 border-t mt-6">
               <h3 className="text-lg font-semibold mb-2 flex items-center"><Info className="mr-2 h-5 w-5 text-accent" />For AI Design Assistant</h3>
               <FormField
@@ -320,7 +315,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                 name="userInfo"
                 render={({ field }) => (
                   <FormItem className="mb-4">
-                    <FormLabel className="flex items-center"><User className="mr-2 h-4 w-4" />Your Info (Profession, Interests)</FormLabel>
+                    <FormLabel className="flex items-center"><User className="mr-2 h-4 w-4" />Staff Info (Profession, Interests)</FormLabel>
                     <FormControl>
                       <Textarea placeholder="e.g. UI/UX designer passionate about accessibility and minimalist design." {...field} />
                     </FormControl>
@@ -333,7 +328,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                 name="targetAudience"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="flex items-center"><Users className="mr-2 h-4 w-4" />Target Audience</FormLabel>
+                    <FormLabel className="flex items-center"><Users className="mr-2 h-4 w-4" />Target Audience for Card</FormLabel>
                     <FormControl>
                       <Textarea placeholder="e.g. Potential employers, freelance clients, design community peers." {...field} />
                     </FormControl>
@@ -350,4 +345,3 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
 }
 
 export const UserProfileForm = memo(UserProfileFormComponent);
-    
