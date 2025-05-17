@@ -58,11 +58,12 @@ export default function SignupPage() {
       const user = userCredential.user;
 
       // Create Company Profile in Firestore
-      const companyRef = doc(db, "companies", user.uid); // Using user.uid as companyId for simplicity here
+      // Using user.uid as companyId for simplicity in this admin-first model
+      const companyRef = doc(db, "companies", user.uid); 
       const companyProfile: CompanyProfile = {
-        id: user.uid, // Company ID = Admin's UID for this initial setup
+        id: user.uid, 
         name: companyName,
-        createdAt: serverTimestamp(), // Firestore server timestamp
+        createdAt: serverTimestamp(), 
         updatedAt: serverTimestamp(),
       };
       await setDoc(companyRef, companyProfile);
@@ -70,13 +71,13 @@ export default function SignupPage() {
       // Create Admin User Profile in Firestore (subcollection of company)
       const adminRef = doc(db, `companies/${companyProfile.id}/admins`, user.uid);
       const adminProfile: AdminUser = {
-        id: user.uid, // Admin ID = Auth UID
+        id: user.uid, 
         companyId: companyProfile.id,
         name: adminName,
         email: user.email || '',
         emailVerified: user.emailVerified,
-        role: 'Owner', // First admin is Owner
-        status: 'Active',
+        role: 'Owner', 
+        status: 'Active', // First admin is active
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -90,11 +91,20 @@ export default function SignupPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Error during admin & company signup:", error);
-      toast({
-        title: "Signup Failed",
-        description: error.message || "Could not create your account. Please try again.",
-        variant: "destructive",
-      });
+      if (error.code === 'auth/api-key-not-valid') {
+        toast({
+          title: "Firebase API Key Error",
+          description: "The Firebase API key is invalid. Please check your .env file and ensure NEXT_PUBLIC_FIREBASE_API_KEY is correct and that you've restarted your development server.",
+          variant: "destructive",
+          duration: 9000,
+        });
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: error.message || "Could not create your account. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
