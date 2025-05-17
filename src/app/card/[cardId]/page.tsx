@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { CardPreview } from '@/components/CardPreview';
-// appTemplates removed as we're moving away from mock data
 import type { StaffRecord, StaffCardData, CardDesignSettings, ContactInfo } from '@/lib/app-types';
 import { defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types'; // Import defaults
 import { sanitizeForUrl, ensureHttps } from '@/lib/utils';
@@ -25,21 +24,22 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { MessageSquarePlus } from 'lucide-react';
-import { db } from '@/lib/firebase'; // Import db
-import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
-import { useAuth } from '@/contexts/auth-context'; // To potentially get companyId if admin is viewing
+import { db } from '@/lib/firebase'; 
+import { collection, query, where, getDocs, limit } from 'firebase/firestore'; 
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import Link from 'next/link';
 
 const CONTACTS_STORAGE_KEY = 'linkup_collected_contacts';
 
 export default function PublicCardPage() {
   const params = useParams();
-  const cardIdFromUrl = typeof params.cardId === 'string' ? params.cardId : ''; // This is the fingerprintUrl
+  const cardIdFromUrl = typeof params.cardId === 'string' ? params.cardId : '';
   const { toast } = useToast();
-  const { companyId: loggedInAdminCompanyId } = useAuth(); // Get companyId if an admin is logged in
+  const { companyId: loggedInAdminCompanyId, loading: authLoading } = useAuth(); 
 
   const [profile, setProfile] = useState<StaffCardData | null>(null);
   const [design, setDesign] = useState<CardDesignSettings | null>(null);
-  const [cardOwnerName, setCardOwnerName] = useState<string>('the card owner'); // For dialogs
+  const [cardOwnerName, setCardOwnerName] = useState<string>('the card owner');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,44 +58,51 @@ export default function PublicCardPage() {
         setIsLoading(false);
         return;
       }
+
+      if (authLoading) { // Wait for auth state to resolve
+        setIsLoading(true);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
 
-      try {
-        // For this to work publicly without knowing the companyId, you'd typically:
-        // 1. Have a top-level collection `publicCards` where doc ID = fingerprintUrl.
-        // 2. Or, use a Cloud Function backend endpoint that can query across companies (less efficient).
-        // For now, we'll simulate by trying to find it in the logged-in admin's company,
-        // or use a placeholder/demo company if no admin is logged in and it's a public view.
-        // THIS IS A SIMPLIFIED APPROACH FOR THE REFACTOR and not a robust public solution.
+      // If no admin is logged in, we cannot securely query company-specific data.
+      // A real public solution would use a backend endpoint or a separate public collection.
+      if (!loggedInAdminCompanyId) {
+        setError('Card not found or access denied. Please log in as an admin of the company to view this card if it\'s not publicly published.');
+        setIsLoading(false);
+        return;
+      }
 
+      try {
         let foundStaffRecord: StaffRecord | null = null;
         
-        // Attempt to find the staff record. This query is inefficient for a truly public page.
-        // In a real app, you would have a direct way to fetch a card by its public ID.
-        const companiesCollectionRef = collection(db, 'companies');
-        const companiesSnapshot = await getDocs(companiesCollectionRef);
+        // Query only within the logged-in admin's company
+        const staffCollectionRef = collection(db, `companies/${loggedInAdminCompanyId}/staff`);
+        const staffQuery = query(staffCollectionRef, where("fingerprintUrl", "==", cardIdFromUrl), limit(1));
+        const staffSnapshot = await getDocs(staffQuery);
 
-        for (const companyDoc of companiesSnapshot.docs) {
-          const staffCollectionRef = collection(db, `companies/${companyDoc.id}/staff`);
-          const staffQuery = query(staffCollectionRef, where("fingerprintUrl", "==", cardIdFromUrl), limit(1));
-          const staffSnapshot = await getDocs(staffQuery);
-
-          if (!staffSnapshot.empty) {
-            foundStaffRecord = { id: staffSnapshot.docs[0].id, ...staffSnapshot.docs[0].data() } as StaffRecord;
-            break; // Found the card
+        if (!staffSnapshot.empty) {
+          const staffData = staffSnapshot.docs[0].data();
+          // Ensure cardDisplayData and designSettings exist on the fetched record
+          if (staffData.cardDisplayData && staffData.designSettings) {
+            foundStaffRecord = { 
+                id: staffSnapshot.docs[0].id, 
+                ...staffData 
+            } as StaffRecord; // Cast needed due to potential missing fields in raw data
+            
+            setProfile(foundStaffRecord.cardDisplayData);
+            setCardOwnerName(foundStaffRecord.cardDisplayData.name || 'the card owner');
+            setDesign({
+              ...foundStaffRecord.designSettings,
+              qrCodeUrl: typeof window !== "undefined" ? window.location.href : '', 
+            });
+          } else {
+            setError('Card data is incomplete for this staff member.');
           }
-        }
-
-        if (foundStaffRecord && foundStaffRecord.cardDisplayData && foundStaffRecord.designSettings) {
-          setProfile(foundStaffRecord.cardDisplayData);
-          setCardOwnerName(foundStaffRecord.cardDisplayData.name || 'the card owner');
-          setDesign({
-            ...foundStaffRecord.designSettings,
-            qrCodeUrl: typeof window !== "undefined" ? window.location.href : '', 
-          });
         } else {
-          setError('Card not found. The link may be incorrect or the card may have been removed.');
+          setError('Card not found within your company. The link may be incorrect or the card may have been removed.');
         }
       } catch (e) {
         console.error("Error fetching public card data:", e);
@@ -106,7 +113,7 @@ export default function PublicCardPage() {
     };
 
     fetchCardData();
-  }, [cardIdFromUrl, loggedInAdminCompanyId]); // loggedInAdminCompanyId is illustrative here for demo
+  }, [cardIdFromUrl, loggedInAdminCompanyId, authLoading]); // Added authLoading dependency
 
   const handleSaveContact = () => {
     if (!profile) return;
@@ -121,7 +128,7 @@ export default function PublicCardPage() {
     vcfContent += `FN:${profile.name}\n`;
 
     if (profile.title) vcfContent += `TITLE:${profile.title}\n`;
-    if (profile.companyName) vcfContent += `ORG:${profile.companyName}\n`; // Use companyName from StaffCardData
+    if (profile.companyName) vcfContent += `ORG:${profile.companyName}\n`; 
     if (profile.phone) vcfContent += `TEL;TYPE=WORK,VOICE:${profile.phone}\n`;
     if (profile.email) vcfContent += `EMAIL:${profile.email}\n`;
     if (profile.website) vcfContent += `URL:${ensureHttps(profile.website)}\n`;
@@ -135,7 +142,7 @@ export default function PublicCardPage() {
          vcfContent += `PHOTO;VALUE=URL:${profile.profilePictureUrl}\n`;
      }
 
-    if (profile.userInfo) vcfContent += `NOTE:About Staff: ${profile.userInfo.replace(/\n/g, '\\n')}\n`; // Changed from "About Me"
+    if (profile.userInfo) vcfContent += `NOTE:About Staff: ${profile.userInfo.replace(/\n/g, '\\n')}\n`;
 
     vcfContent += 'END:VCARD';
     
@@ -184,7 +191,6 @@ export default function PublicCardPage() {
         description: `Thank you, ${contactName}! Your information has been shared with ${cardOwnerName}.`,
       });
       setIsContactDialogOpen(false);
-      // Reset form
       setContactName('');
       setContactEmail('');
       setContactPhone('');
@@ -202,7 +208,7 @@ export default function PublicCardPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading) { // Show loading if auth is still loading
     return (
       <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 bg-background">
         <Skeleton className="w-full max-w-sm h-[calc(100vw_*_16/9)] sm:h-[650px] rounded-lg shadow-xl" />
@@ -216,7 +222,7 @@ export default function PublicCardPage() {
       <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <h1 className="text-2xl font-semibold text-destructive mb-4">Error</h1>
         <p className="text-lg text-muted-foreground">{error}</p>
-        <Link href="/login" className="mt-6 text-primary hover:underline">Go to Login</Link>
+        <Link href="/login" className="mt-6 text-primary hover:underline">Go to Admin Login</Link>
       </div>
     );
   }
@@ -237,7 +243,7 @@ export default function PublicCardPage() {
                 className="mt-4 py-3 px-6 text-base fixed bottom-20 left-1/2 -translate-x-1/2 sm:static sm:bottom-auto sm:left-auto sm:-translate-x-0"
                 style={{
                     backgroundColor: design.colorScheme.primaryColor, 
-                    color: design.colorScheme.cardBackground // Ensure contrast
+                    color: design.colorScheme.cardBackground 
                 }}
              >
                 <MessageSquarePlus className="mr-2 h-5 w-5" /> Connect with {cardOwnerName}
@@ -284,15 +290,15 @@ export default function PublicCardPage() {
             </form>
           </DialogContent>
         </Dialog>
-
       </div>
     );
   }
 
+  // Fallback if profile/design are somehow null after loading and no error
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full p-4 text-center bg-background">
         <p className="text-lg text-muted-foreground">Could not load card data. The card may not exist or the link is incorrect.</p>
-         <Link href="/login" className="mt-6 text-primary hover:underline">Go to Login</Link>
+         <Link href="/login" className="mt-6 text-primary hover:underline">Go to Admin Login</Link>
     </div>
   );
 }
