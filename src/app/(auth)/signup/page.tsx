@@ -91,7 +91,14 @@ export default function SignupPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Error during admin & company signup:", error);
-      if (error.code === 'auth/api-key-not-valid') {
+      if (error.code === 'auth/email-already-in-use') {
+        toast({
+          title: "Signup Failed",
+          description: "This email address is already in use. Please try logging in or use a different email.",
+          variant: "destructive",
+          duration: 7000, 
+        });
+      } else if (error.code === 'auth/api-key-not-valid') {
         toast({
           title: "Firebase API Key Error",
           description: "The Firebase API key is invalid. Please check your .env file and ensure NEXT_PUBLIC_FIREBASE_API_KEY is correct and that you've restarted your development server.",
