@@ -31,13 +31,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
-
-const MOCK_TEAMS_DATA: Team[] = [
-  { id: 'team1', name: 'Sales Team Alpha', description: 'Handles all sales operations.', memberCount: 12, managerName: 'Alice Smith', managerId: 'staff-alice' },
-  { id: 'team2', name: 'Marketing Crew Gamma', description: 'Digital and content marketing.', memberCount: 8, managerName: 'Bob Johnson', managerId: 'staff-bob' },
-  { id: 'team3', name: 'Engineering Squad Beta', description: 'Product development and R&D.', memberCount: 25, managerName: 'Carol White', managerId: 'staff-carol' },
-  { id: 'team4', name: 'Support Heroes', description: 'Customer support and success.', memberCount: 5, managerName: 'David Brown', managerId: 'staff-david' },
-];
+// MOCK_TEAMS_DATA is removed. Teams will be fetched or start empty.
 
 interface NewTeamFormState {
   name: string;
@@ -48,13 +42,13 @@ interface NewTeamFormState {
 const initialNewTeamState: NewTeamFormState = {
     name: '',
     description: '',
-    managerId: '',
+    managerId: 'no-manager', // Default to 'no-manager'
 };
 
 export default function TeamsPage() {
   const { currentUser, companyId, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [teams, setTeams] = useState<Team[]>(MOCK_TEAMS_DATA); 
+  const [teams, setTeams] = useState<Team[]>([]); // Initialize with an empty array
   const { toast } = useToast();
 
   const [isCreateTeamDialogOpen, setIsCreateTeamDialogOpen] = useState(false);
@@ -65,7 +59,8 @@ export default function TeamsPage() {
   const fetchStaff = useCallback(async () => {
     if (!companyId) {
         if (!authLoading) {
-            toast({ title: "Error", description: "Company ID not available to fetch staff for team manager selection.", variant: "destructive" });
+            // Toast removed as per previous discussion for a cleaner startup
+            // toast({ title: "Error", description: "Company ID not available to fetch staff.", variant: "destructive" });
         }
         return;
     }
@@ -86,23 +81,23 @@ export default function TeamsPage() {
         } as StaffRecord);
       });
       setStaffList(fetchedStaff);
-      if (fetchedStaff.length > 0 && !newTeamForm.managerId) {
-        setNewTeamForm(prev => ({...prev, managerId: fetchedStaff[0].id}));
-      } else if (fetchedStaff.length === 0) {
-        setNewTeamForm(prev => ({...prev, managerId: ''}));
-      }
+      // Do not automatically select the first staff member if the list is not empty.
+      // Keep the default 'no-manager' or the current selection.
+      // setNewTeamForm(prev => ({...prev, managerId: fetchedStaff.length > 0 && !prev.managerId ? fetchedStaff[0].id : (prev.managerId || 'no-manager')}));
     } catch (error) {
       console.error("Error fetching staff for manager selection:", error);
       toast({ title: "Error", description: "Could not fetch staff list for manager selection.", variant: "destructive" });
     } finally {
       setIsLoadingStaff(false);
     }
-  }, [companyId, toast, authLoading, newTeamForm.managerId]);
+  }, [companyId, toast, authLoading]);
 
   useEffect(() => {
     if (!authLoading && companyId) {
         fetchStaff();
     }
+    // TODO: Add fetching of teams from Firestore here once backend is ready
+    // For now, teams list remains empty or populated by client-side additions
   }, [authLoading, companyId, fetchStaff]);
 
 
@@ -112,7 +107,7 @@ export default function TeamsPage() {
   );
 
   const handleOpenCreateTeamDialog = () => {
-    setNewTeamForm({...initialNewTeamState, managerId: staffList.length > 0 ? staffList[0].id : ''});
+    setNewTeamForm(initialNewTeamState); // Reset form, managerId will be 'no-manager'
     setIsCreateTeamDialogOpen(true);
   };
 
@@ -130,24 +125,19 @@ export default function TeamsPage() {
       });
       return;
     }
-    if (!newTeamForm.managerId) {
-      toast({
-        title: "Manager Required",
-        description: "Please select a manager for the new team.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Manager is now optional, so no need to validate newTeamForm.managerId here
 
-    const manager = staffList.find(staff => staff.id === newTeamForm.managerId);
+    const manager = newTeamForm.managerId && newTeamForm.managerId !== 'no-manager'
+                    ? staffList.find(staff => staff.id === newTeamForm.managerId)
+                    : undefined;
 
     const newTeam: Team = {
       id: `team-${Date.now()}`,
       name: newTeamForm.name,
       description: newTeamForm.description,
       memberCount: 0,
-      managerId: newTeamForm.managerId,
-      managerName: manager?.name || 'N/A',
+      managerId: manager ? manager.id : undefined,
+      managerName: manager ? manager.name : undefined, // Or 'N/A' or leave undefined
       createdAt: new Date().toISOString(),
     };
 
@@ -160,7 +150,6 @@ export default function TeamsPage() {
   };
 
   const handleDeleteTeam = (teamId: string) => {
-    // Add confirmation dialog here in a real app
     setTeams(teams.filter(team => team.id !== teamId));
     toast({
         title: "Team Deleted",
@@ -182,7 +171,7 @@ export default function TeamsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button onClick={handleOpenCreateTeamDialog} disabled={isLoadingStaff || !companyId}>
+        <Button onClick={handleOpenCreateTeamDialog} disabled={!companyId}>
           <PlusCircle className="mr-2 h-5 w-5" /> Create New Team
         </Button>
       </div>
@@ -192,7 +181,7 @@ export default function TeamsPage() {
           <DialogHeader>
             <DialogTitle>Create New Team</DialogTitle>
             <DialogDescription>
-              Fill in the details below to create a new team.
+              Fill in the details below to create a new team. Manager assignment is optional.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveNewTeam}>
@@ -218,25 +207,27 @@ export default function TeamsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="newTeamManager">Manager</Label>
+                <Label htmlFor="newTeamManager">Manager (Optional)</Label>
                 {isLoadingStaff ? (
                     <Skeleton className="h-10 w-full" />
-                ) : staffList.length > 0 ? (
+                ) : (
                     <Select
                         value={newTeamForm.managerId}
                         onValueChange={(value) => handleFormChange('managerId', value)}
                     >
                         <SelectTrigger id="newTeamManager">
-                        <SelectValue placeholder="Select a manager" />
+                        <SelectValue placeholder="Select a manager (optional)" />
                         </SelectTrigger>
                         <SelectContent>
+                        <SelectItem value="no-manager">No Manager (Assign Later)</SelectItem>
                         {staffList.map(staff => (
                             <SelectItem key={staff.id} value={staff.id}>{staff.name} ({staff.email})</SelectItem>
                         ))}
                         </SelectContent>
                     </Select>
-                ) : (
-                    <p className="text-sm text-muted-foreground">No staff available to assign as manager. Please add staff first.</p>
+                )}
+                {staffList.length === 0 && !isLoadingStaff && (
+                    <p className="text-xs text-muted-foreground">No staff available to assign as manager.</p>
                 )}
               </div>
             </div>
@@ -244,7 +235,7 @@ export default function TeamsPage() {
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={isLoadingStaff || (staffList.length === 0 && !newTeamForm.managerId)}>Save Team</Button>
+              <Button type="submit" disabled={!companyId}>Save Team</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -271,7 +262,7 @@ export default function TeamsPage() {
             <CardDescription>Get started by creating your first team to organize users and assign resources.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleOpenCreateTeamDialog} size="lg" disabled={isLoadingStaff || !companyId}>
+            <Button onClick={handleOpenCreateTeamDialog} size="lg" disabled={!companyId}>
               <PlusCircle className="mr-2 h-5 w-5" /> Create Your First Team
             </Button>
           </CardContent>
@@ -314,5 +305,3 @@ export default function TeamsPage() {
     </div>
   );
 }
-
-    
