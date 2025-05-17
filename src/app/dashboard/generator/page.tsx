@@ -1,13 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 // Removed Header as this page is now within the dashboard layout
 import { UserProfileForm } from '@/components/UserProfileForm';
 import { CardPreview } from '@/components/CardPreview';
-import { CardDesigner } from '@/components/CardDesigner';
-import { AiDesignAssistant } from '@/components/AiDesignAssistant';
-import { ShareCard } from '@/components/ShareCard';
+
 // OnboardingDialog might not be relevant here, or could be adapted
 // import { QuickShareFAB } from '@/components/QuickShareFAB'; // FAB might conflict with dashboard structure, review later
 import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
@@ -16,6 +15,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { sanitizeForUrl } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Blocks } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+
+// Dynamically import larger components
+const CardDesigner = dynamic(() => import('@/components/CardDesigner').then(mod => mod.CardDesigner), {
+  loading: () => <Skeleton className="h-[400px] w-full rounded-lg" />,
+});
+const AiDesignAssistant = dynamic(() => import('@/components/AiDesignAssistant').then(mod => mod.AiDesignAssistant), {
+  loading: () => <Skeleton className="h-[300px] w-full rounded-lg" />,
+});
+const ShareCard = dynamic(() => import('@/components/ShareCard').then(mod => mod.ShareCard), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-lg" />,
+});
 
 
 // const ONBOARDING_STORAGE_KEY = 'linkup_onboarding_completed_admin_context'; 
@@ -165,13 +177,17 @@ export default function GeneratorPage() { // Was EditorPage
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">
             <UserProfileForm profile={staffCardProfile} onProfileChange={handleProfileChange} />
-            <CardDesigner design={cardDesign} onDesignChange={handleDesignChange} />
-            <AiDesignAssistant 
-              userProfile={staffCardProfile} 
-              currentDesign={cardDesign} 
-              onApplySuggestions={handleAiApplySuggestions} 
-              onUpdateProfileForAI={handleUpdateProfileForAI}
-            />
+ <Suspense fallback={<Skeleton className="h-[400px] w-full rounded-lg" />}>
+              <CardDesigner design={cardDesign} onDesignChange={handleDesignChange} />
+ </Suspense>
+ <Suspense fallback={<Skeleton className="h-[300px] w-full rounded-lg" />}>
+              <AiDesignAssistant
+ userProfile={staffCardProfile}
+ currentDesign={cardDesign}
+ onApplySuggestions={handleAiApplySuggestions}
+ onUpdateProfileForAI={handleUpdateProfileForAI}
+ />
+ </Suspense>
           </div>
 
           <div className="lg:col-span-1 space-y-8 lg:sticky lg:top-8">
@@ -179,7 +195,9 @@ export default function GeneratorPage() { // Was EditorPage
             <ShareCard cardUrl={cardDesign.qrCodeUrl} />
           </div>
         </div>
-        {/* {isClient && <QuickShareFAB cardUrl={cardDesign.qrCodeUrl} />} Commented out for now, consider dashboard integration */}
+ <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-lg" />}>
+          <ShareCard cardUrl={cardDesign.qrCodeUrl} />
+ </Suspense>
       </main>
       {/* No Footer component from src/components/Footer here */}
     </div>

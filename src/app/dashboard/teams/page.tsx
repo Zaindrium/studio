@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Users, PlusCircle, Search, Settings, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import {
-  Dialog,
+  Dialog, // Add Dialog if it was missing
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -21,9 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 
 // Placeholder data for teams
 const MOCK_TEAMS_DATA = [
-  { id: 'team1', name: 'Sales Team', description: 'Handles all sales operations.', memberCount: 12, manager: 'Alice Smith' },
-  { id: 'team2', name: 'Marketing Crew', description: 'Digital and content marketing.', memberCount: 8, manager: 'Bob Johnson' },
-  { id: 'team3', name: 'Engineering Squad', description: 'Product development and R&D.', memberCount: 25, manager: 'Carol White' },
+  { id: 'team1', name: 'Sales Team Alpha', description: 'Handles all sales operations.', memberCount: 12, manager: 'Alice Smith' },
+  { id: 'team2', name: 'Marketing Crew Gamma', description: 'Digital and content marketing.', memberCount: 8, manager: 'Bob Johnson' },
+  { id: 'team3', name: 'Engineering Squad Beta', description: 'Product development and R&D.', memberCount: 25, manager: 'Carol White' },
   { id: 'team4', name: 'Support Heroes', description: 'Customer support and success.', memberCount: 5, manager: 'David Brown' },
 ];
 
@@ -34,6 +34,10 @@ interface Team {
   memberCount: number;
   manager: string;
 }
+
+// Dynamically import the Dialog and its content
+// const LazyCreateTeamDialog = lazy(() => import('@/components/dashboard/teams/CreateTeamDialog'));
+// Note: Since CreateTeamDialog is not a separate component yet, we use the built-in Dialog for now.
 
 export default function TeamsPage() {
   const [searchTerm, setSearchTerm] = useState('');

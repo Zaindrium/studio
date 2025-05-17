@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,42 +9,26 @@ import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import type { AuthenticatedUser, UserStatus } from '@/lib/app-types'; 
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { TableCell, TableHead } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Dynamically import Dialog and AlertDialog
+const LazyDialog = lazy(() => import("@/components/ui/dialog").then(m => ({ default: m.Dialog })));
+const LazyAlertDialog = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialog })));
 
 
 const MOCK_ADMINS_DATA: AuthenticatedUser[] = [
@@ -283,67 +267,80 @@ export default function AdministratorsPage() {
         </CardFooter>
       )}
 
-      <Dialog open={isInviteAdminDialogOpen} onOpenChange={setIsInviteAdminDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingAdmin ? 'Edit Administrator' : 'Invite New Administrator'}</DialogTitle>
-            <DialogDescription>
-              {editingAdmin ? `Update details for ${editingAdmin.name}.` : 'Fill in the details below to invite a new administrator. They will receive an email with setup instructions.'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSaveAdmin}>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="adminName">Full Name</Label>
-                <Input
-                  id="adminName"
-                  value={newAdminForm.name || ''}
-                  onChange={(e) => handleFormChange('name', e.target.value)}
-                  placeholder="e.g., Alex Johnson"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="adminEmail">Email Address</Label>
-                <Input
-                  id="adminEmail"
-                  type="email"
-                  value={newAdminForm.email || ''}
-                  onChange={(e) => handleFormChange('email', e.target.value)}
-                  placeholder="e.g., alex.admin@example.com"
-                  required
-                  disabled={!!editingAdmin} 
-                />
-                 {editingAdmin && <p className="text-xs text-muted-foreground">Email address cannot be changed after creation.</p>}
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button type="submit">{editingAdmin ? 'Save Changes' : 'Send Invitation'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <Suspense fallback={isInviteAdminDialogOpen ? <Skeleton className=\"w-full h-[300px] rounded-lg\" /> : null}>
+        <LazyDialog open={isInviteAdminDialogOpen} onOpenChange={setIsInviteAdminDialogOpen}>
+          {/* Import and use DialogContent and other sub-components directly if they are small
+              or lazy load them as well if they are large. For simplicity, assuming they are small.
+              If DialogContent itself is large, it might need its own lazy load.
+           */}
+          <Suspense fallback={<Skeleton className=\"w-full h-[250px] rounded-lg\" />}>
+            <import(\"@/components/ui/dialog\").then(m => m.DialogContent) className="sm:max-w-md">
+              <import(\"@/components/ui/dialog\").then(m => m.DialogHeader)>
+                <import(\"@/components/ui/dialog\").then(m => m.DialogTitle)>{editingAdmin ? 'Edit Administrator' : 'Invite New Administrator'}</import(\"@/components/ui/dialog\").then(m => m.DialogTitle)>
+                <import(\"@/components/ui/dialog\").then(m => m.DialogDescription)>
+                  {editingAdmin ? `Update details for ${editingAdmin.name}.` : 'Fill in the details below to invite a new administrator. They will receive an email with setup instructions.'}
+                </import(\"@/components/ui/dialog\").then(m => m.DialogDescription)>
+              </import(\"@/components/ui/dialog\").then(m => m.DialogHeader)>
+              <form onSubmit={handleSaveAdmin}>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="adminName">Full Name</Label>
+                    <Input
+                      id="adminName"
+                      value={newAdminForm.name || ''}
+                      onChange={(e) => handleFormChange('name', e.target.value)}
+                      placeholder="e.g., Alex Johnson"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="adminEmail">Email Address</Label>
+                    <Input
+                      id="adminEmail"
+                      type="email"
+                      value={newAdminForm.email || ''}
+                      onChange={(e) => handleFormChange('email', e.target.value)}
+                      placeholder="e.g., alex.admin@example.com"
+                      required
+                      disabled={!!editingAdmin}
+                    />
+                     {editingAdmin && <p className="text-xs text-muted-foreground">Email address cannot be changed after creation.</p>}
+                  </div>
+                </div>
+                <import(\"@/components/ui/dialog\").then(m => m.DialogFooter)>
+                  <import(\"@/components/ui/dialog\").then(m => m.DialogClose) asChild>
+                    <Button type="button" variant="outline">Cancel</Button>
+                  </import(\"@/components/ui/dialog\").then(m => m.DialogClose)>
+                  <Button type="submit">{editingAdmin ? 'Save Changes' : 'Send Invitation'}</Button>
+                </import(\"@/components/ui/dialog\").then(m => m.DialogFooter)>
+              </form>
+            </import(\"@/components/ui/dialog\").then(m => m.DialogContent)>
+          </Suspense>
+        </LazyDialog>
+      </Suspense>
 
-      <AlertDialog open={isDeleteAdminAlertOpen} onOpenChange={setIsDeleteAdminAlertOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the administrator account for "{adminToDelete?.name}".
-                They will lose all administrative privileges.
-            </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setAdminToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAdmin}>
-                Yes, delete administrator
-            </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Suspense fallback={isDeleteAdminAlertOpen ? <Skeleton className=\"w-full h-[200px] rounded-lg\" /> : null}>
+        <LazyAlertDialog open={isDeleteAdminAlertOpen} onOpenChange={setIsDeleteAdminAlertOpen}>
+          {/* Import and use AlertDialogContent and other sub-components directly or lazy load them */}
+          <Suspense fallback={<Skeleton className=\"w-full h-[150px] rounded-lg\" />}>
+            <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogContent)>
+              <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogHeader)>
+                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogTitle)>Are you absolutely sure?</import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogTitle)>
+                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogDescription)>
+                    This action cannot be undone. This will permanently delete the administrator account for "{adminToDelete?.name}".
+                    They will lose all administrative privileges.
+                </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogDescription)>
+              </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogHeader)>
+              <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogFooter)>
+                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogCancel) onClick={() => setAdminToDelete(null)}>Cancel</import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogCancel)>
+                <import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogAction) onClick={handleDeleteAdmin}>
+                    Yes, delete administrator
+                </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogAction)>
+              </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogFooter)>
+            </import(\"@/components/ui/alert-dialog\").then(m => m.AlertDialogContent)>
+          </Suspense>
+        </LazyAlertDialog>
+      </Suspense>
     </Card>
   );
 }

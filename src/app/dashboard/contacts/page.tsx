@@ -15,13 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+import { // Keep DialogTrigger and DialogClose for now, as they are used outside the lazy-loaded component
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -35,19 +29,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Contact as ContactIcon, Search, MoreVertical, Trash2, Eye, PlusCircle, MessageSquare } from 'lucide-react';
 import type { ContactInfo } from '@/lib/app-types';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast'; // Assuming useToast is small or used elsewhere
 import { formatDistanceToNow } from 'date-fns';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+import { // Keep AlertDialogCancel and AlertDialogAction for now
+ AlertDialogAction,
+ AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 
+// Dynamically import components that are not immediately needed
+const LazyAddContactDialog = React.lazy(() => import('@/components/contacts/add-contact-dialog'));
+const LazyDeleteContactAlert = React.lazy(() => import('@/components/contacts/delete-contact-alert'));
+const LazyViewMessageAlert = React.lazy(() => import('@/components/contacts/view-message-alert')); // Assuming you might want a dedicated modal later
 
 const CONTACTS_STORAGE_KEY = 'linkup_collected_contacts';
 
@@ -56,12 +48,7 @@ export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
-  const [isAddManualContactDialogOpen, setIsAddManualContactDialogOpen] = useState(false);
-  const [manualContactName, setManualContactName] = useState('');
-  const [manualContactEmail, setManualContactEmail] = useState('');
-  const [manualContactPhone, setManualContactPhone] = useState('');
-  const [manualContactCompany, setManualContactCompany] = useState('');
-  const [manualContactMessage, setManualContactMessage] = useState('');
+  const [isAddManualContactDialogOpen, setIsAddManualContactDialogOpen] = useState(false); // Keep state here
   const [isSubmittingManualContact, setIsSubmittingManualContact] = useState(false);
 
   const [isDeleteContactAlertOpen, setIsDeleteContactAlertOpen] = useState(false);
@@ -131,12 +118,7 @@ export default function ContactsPage() {
   };
 
   const handleOpenManualAddDialog = () => {
-    setManualContactName('');
-    setManualContactEmail('');
-    setManualContactPhone('');
-    setManualContactCompany('');
-    setManualContactMessage('');
-    setIsAddManualContactDialogOpen(true);
+    setIsAddManualContactDialogOpen(true); // Only open the dialog
   };
 
   const handleSubmitManualContact = (event: React.FormEvent) => {
@@ -245,7 +227,7 @@ export default function ContactsPage() {
                         </DropdownMenuItem>
                         {contact.message && 
                           <DropdownMenuItem onClick={() => alert(`Message from ${contact.name}:\n\n${contact.message}`)}>
-                            <MessageSquare className="mr-2 h-4 w-4" />
+                            <MessageSquare className="mr-2 h-4 w-4" /> {/* Consider replacing alert with a modal and lazy loading it */}
                             View Message
                           </DropdownMenuItem>
                         }
@@ -281,63 +263,29 @@ export default function ContactsPage() {
         </CardFooter>
       )}
 
-      <Dialog open={isAddManualContactDialogOpen} onOpenChange={setIsAddManualContactDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Contact Manually</DialogTitle>
-            <DialogDescription>
-              Enter the details for the new contact.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmitManualContact}>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-1">
-                <Label htmlFor="manual-contact-name">Full Name *</Label>
-                <Input id="manual-contact-name" value={manualContactName} onChange={(e) => setManualContactName(e.target.value)} placeholder="Contact's Name" required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="manual-contact-email">Email *</Label>
-                <Input id="manual-contact-email" type="email" value={manualContactEmail} onChange={(e) => setManualContactEmail(e.target.value)} placeholder="contact.email@example.com" required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="manual-contact-phone">Phone (Optional)</Label>
-                <Input id="manual-contact-phone" type="tel" value={manualContactPhone} onChange={(e) => setManualContactPhone(e.target.value)} placeholder="Contact's Phone Number" />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="manual-contact-company">Company (Optional)</Label>
-                <Input id="manual-contact-company" value={manualContactCompany} onChange={(e) => setManualContactCompany(e.target.value)} placeholder="Contact's Company Name" />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="manual-contact-message">Message/Notes (Optional)</Label>
-                <Textarea id="manual-contact-message" value={manualContactMessage} onChange={(e) => setManualContactMessage(e.target.value)} placeholder="Any relevant notes..." />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={isSubmittingManualContact}>Cancel</Button>
-              </DialogClose>
-              <Button type="submit" disabled={isSubmittingManualContact}>
-                {isSubmittingManualContact ? 'Adding...' : 'Add Contact'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+ {/* Dynamically loaded Add Contact Dialog */}
+ {isAddManualContactDialogOpen && (
+  <React.Suspense fallback={<div>Loading Dialog...</div>}>
+  <LazyAddContactDialog
+  isOpen={isAddManualContactDialogOpen}
+  onClose={() => setIsAddManualContactDialogOpen(false)}
+  onSubmit={handleSubmitManualContact}
+  isSubmitting={isSubmittingManualContact}
+  />
+  </React.Suspense>
+ )}
 
-      <AlertDialog open={isDeleteContactAlertOpen} onOpenChange={setIsDeleteContactAlertOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the contact "{contactToDelete?.name}".
-                </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setContactToDelete(null)}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteContact}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+ {/* Dynamically loaded Delete Contact Alert Dialog */}
+ {isDeleteContactAlertOpen && (
+  <React.Suspense fallback={<div>Loading Alert...</div>}>
+  <LazyDeleteContactAlert
+  isOpen={isDeleteContactAlertOpen}
+  onClose={() => setIsDeleteContactAlertOpen(false)}
+  onConfirm={handleDeleteContact}
+  contactName={contactToDelete?.name} // Pass contact name for context
+  />
+  </React.Suspense>
+ )}
     </Card>
   );
 }

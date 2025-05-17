@@ -1,15 +1,23 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for fallback
 import { Mail, Key, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+// Lazy load UI components
+const Button = lazy(() => import("@/components/ui/button").then(m => ({ default: m.Button })));
+const Card = lazy(() => import("@/components/ui/card").then(m => ({ default: m.Card })));
+const CardContent = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardContent })));
+const CardDescription = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardDescription })));
+const CardFooter = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardFooter })));
+const CardHeader = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardHeader })));
+const CardTitle = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardTitle })));
+const Input = lazy(() => import("@/components/ui/input").then(m => ({ default: m.Input })));
+const Label = lazy(() => import("@/components/ui/label").then(m => ({ default: m.Label })));
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,53 +58,55 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl flex items-center justify-center">
-          <LogIn className="mr-2 h-6 w-6 text-primary" /> Admin Log In to LinkUP
-        </CardTitle>
-        <CardDescription>
-          Enter your administrator credentials to access your company's dashboard. <br/>
-          (Try: admin@examplecorp.com, Pass: password123)
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary"/>Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="admin@examplecorp.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="password123"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-3">
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Logging In...' : 'Log In'}
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Need to set up a new company?{' '}
-            <Link href="/signup" className="font-medium text-primary hover:underline">
-              Sign Up
-            </Link>
-          </p>
-        </CardFooter>
-      </form>
-    </Card>
+    <Suspense fallback={<Skeleton className="w-full h-[400px] rounded-lg" />}>
+      <Card className="w-full">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl flex items-center justify-center">
+            <LogIn className="mr-2 h-6 w-6 text-primary" /> Admin Log In to LinkUP
+          </CardTitle>
+          <CardDescription>
+            Enter your administrator credentials to access your company's dashboard. <br/>
+            (Try: admin@examplecorp.com, Pass: password123)
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary"/>Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@examplecorp.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center"><Key className="mr-2 h-4 w-4 text-primary"/>Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="password123"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-3">
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Logging In...' : 'Log In'}
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Need to set up a new company?{' '}
+              <Link href="/signup" className="font-medium text-primary hover:underline">
+                Sign Up
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
+    </Suspense>
   );
 }
