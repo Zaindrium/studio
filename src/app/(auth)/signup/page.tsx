@@ -10,6 +10,10 @@ import { Label } from "@/components/ui/label";
 import Link from 'next/link';
 import { UserPlus, Mail, Key, Building, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { auth, db } from '@/lib/firebase'; // Import Firebase auth and db
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import type { CompanyProfile, AdminUser } from '@/lib/app-types';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,7 +22,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [adminName, setAdminName] = useState(''); // Admin's full name
+  const [adminName, setAdminName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -49,17 +53,51 @@ export default function SignupPage() {
         return;
     }
 
-    // Placeholder for actual signup logic (creating company, admin user in Firebase)
-    console.log("Admin & Company Signup attempt with:", { adminName, email, password, companyName });
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-    toast({
-      title: "Company Account Created!",
-      description: `Welcome, ${adminName}! Redirecting to your Business Dashboard...`,
-      variant: "default",
-    });
-    router.push('/dashboard'); // Redirect to dashboard after admin/company setup
-    // In a real app, might redirect to subscription or email verification.
+      // Create Company Profile in Firestore
+      const companyRef = doc(db, "companies", user.uid); // Using user.uid as companyId for simplicity here
+      const companyProfile: CompanyProfile = {
+        id: user.uid, // Company ID = Admin's UID for this initial setup
+        name: companyName,
+        createdAt: serverTimestamp(), // Firestore server timestamp
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(companyRef, companyProfile);
+
+      // Create Admin User Profile in Firestore (subcollection of company)
+      const adminRef = doc(db, `companies/${companyProfile.id}/admins`, user.uid);
+      const adminProfile: AdminUser = {
+        id: user.uid, // Admin ID = Auth UID
+        companyId: companyProfile.id,
+        name: adminName,
+        email: user.email || '',
+        emailVerified: user.emailVerified,
+        role: 'Owner', // First admin is Owner
+        status: 'Active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(adminRef, adminProfile);
+
+      toast({
+        title: "Company Account Created!",
+        description: `Welcome, ${adminName}! Redirecting to your Business Dashboard...`,
+        variant: "default",
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Error during admin & company signup:", error);
+      toast({
+        title: "Signup Failed",
+        description: error.message || "Could not create your account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -116,6 +154,7 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
             />
           </div>
            <div className="space-y-2">
@@ -127,6 +166,7 @@ export default function SignupPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
+              minLength={6}
             />
           </div>
         </CardContent>

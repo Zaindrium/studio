@@ -4,11 +4,12 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for fallback
+import { Skeleton } from '@/components/ui/skeleton';
 import { Mail, Key, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase'; // Import Firebase auth
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
-// Lazy load UI components
 const Button = lazy(() => import("@/components/ui/button").then(m => ({ default: m.Button })));
 const Card = lazy(() => import("@/components/ui/card").then(m => ({ default: m.Card })));
 const CardContent = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardContent })));
@@ -34,25 +35,28 @@ export default function LoginPage() {
       description: "Please wait while we verify your credentials.",
     });
 
-    // Placeholder for actual admin login logic (verifying against Firebase Auth)
-    console.log("Admin Login attempt with:", { email, password });
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // On successful Firebase login, Firebase handles session.
+      // Now, you would typically fetch the user's role/company info from Firestore
+      // to determine if they are indeed an admin for *this* application.
+      // For this step, we'll assume login success means they are a valid admin.
 
-    // SIMULATED SUCCESS & REDIRECTION LOGIC - For Admin
-    if (email.toLowerCase() === 'admin@examplecorp.com' && password === 'password123') {
       toast({
         title: "Admin Login Successful!",
         description: "Redirecting to your Business Dashboard...",
         variant: "default",
       });
-      router.push('/dashboard'); // All admin logins go to dashboard
-    } else {
-      toast({ 
-        title: "Admin Login Failed", 
-        description: "Invalid email or password. Try admin@examplecorp.com with password 'password123'.", 
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Admin Login Failed:", error);
+      toast({
+        title: "Admin Login Failed",
+        description: error.message || "Invalid email or password.",
         variant: "destructive",
         duration: 7000,
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -65,8 +69,7 @@ export default function LoginPage() {
             <LogIn className="mr-2 h-6 w-6 text-primary" /> Admin Log In to LinkUP
           </CardTitle>
           <CardDescription>
-            Enter your administrator credentials to access your company's dashboard. <br/>
-            (Try: admin@examplecorp.com, Pass: password123)
+            Enter your administrator credentials to access your company's dashboard.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -87,7 +90,7 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="password123"
+                placeholder="Your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
