@@ -58,7 +58,7 @@ import { db } from '@/lib/firebase'; // Import Firestore instance
 import { 
   collection, 
   query, 
-  where, 
+  // where, // Not used currently, but keep for potential future filtering
   getDocs, 
   addDoc, 
   doc, 
@@ -70,10 +70,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Simulated admin user data - replace with actual auth context later
-// This MOCK_ADMIN_USER provides the companyId needed for Firestore queries.
 const MOCK_ADMIN_USER: AdminUser & { organizationName: string } = {
   id: "admin-user-123",
-  companyId: "company-abc-789", // CRUCIAL: This needs to match a companyId in your Firestore
+  companyId: "company-abc-789", 
   organizationName: "LinkUP Corp", 
   name: "Admin LoggedIn",
   email: "admin@examplecorp.com",
@@ -87,10 +86,13 @@ const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team1', name: 'Sales Team Alpha' },
   { id: 'team2', name: 'Marketing Crew Gamma' },
   { id: 'team3', name: 'Engineering Squad Beta' },
-  // In a real app, these would be fetched from /companies/{companyId}/teams
 ];
 
-const initialNewStaffState: Partial<StaffRecord> & { teamId: string } = {
+const generateUniqueFingerprint = () => {
+  return sanitizeForUrl(`staff-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`);
+};
+
+const initialNewStaffState: Partial<StaffRecord> & { teamId?: string } = { // teamId is optional
     name: '',
     email: '',
     role: 'Employee',
@@ -107,12 +109,12 @@ export default function UsersPage() {
   const { toast } = useToast();
 
   const [isAddStaffDialogOpen, setIsAddStaffDialogOpen] = useState(false);
-  const [newStaffForm, setNewStaffForm] = useState<Partial<StaffRecord> & { teamId: string }>(initialNewStaffState);
+  const [newStaffForm, setNewStaffForm] = useState<Partial<StaffRecord> & { teamId?: string }>(initialNewStaffState);
   const [editingStaff, setEditingStaff] = useState<StaffRecord | null>(null);
   const [isDeleteStaffAlertOpen, setIsDeleteStaffAlertOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffRecord | null>(null);
 
-  const adminUser = MOCK_ADMIN_USER; // Using mock admin for companyId
+  const adminUser = MOCK_ADMIN_USER;
 
   const fetchStaff = useCallback(async () => {
     if (!adminUser.companyId) {
@@ -123,7 +125,7 @@ export default function UsersPage() {
     setIsLoading(true);
     try {
       const staffCollectionRef = collection(db, `companies/${adminUser.companyId}/staff`);
-      const q = query(staffCollectionRef); // Add ordering or filtering if needed
+      const q = query(staffCollectionRef); 
       const querySnapshot = await getDocs(q);
       const fetchedStaff: StaffRecord[] = [];
       querySnapshot.forEach((doc) => {
@@ -131,9 +133,9 @@ export default function UsersPage() {
         fetchedStaff.push({ 
           id: doc.id, 
           ...data,
-          createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-          updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString(),
-          lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt,
+          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date()).toISOString(),
+          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date()).toISOString(),
+          lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt || '-',
         } as StaffRecord);
       });
       setStaffList(fetchedStaff);
@@ -169,13 +171,12 @@ export default function UsersPage() {
       });
     } else {
       setEditingStaff(null);
-      const defaultFingerprint = `new-staff-${Date.now().toString().slice(-5)}`;
-      setNewStaffForm({...initialNewStaffState, fingerprintUrl: sanitizeForUrl(defaultFingerprint) });
+      setNewStaffForm({...initialNewStaffState, fingerprintUrl: generateUniqueFingerprint() });
     }
     setIsAddStaffDialogOpen(true);
   };
   
-  const handleFormChange = (field: keyof (Partial<StaffRecord> & { teamId: string }), value: string | StaffRole | UserStatus) => {
+  const handleFormChange = (field: keyof (Partial<StaffRecord> & { teamId?: string }), value: string | StaffRole | UserStatus) => {
     setNewStaffForm(prev => ({ ...prev, [field]: value }));
   };
 
@@ -190,33 +191,45 @@ export default function UsersPage() {
       return;
     }
 
-    const staffDataToSave: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount'> & { teamId?: string, updatedAt?: Timestamp, createdAt?: Timestamp } = {
+    let finalFingerprintUrl = newStaffForm.fingerprintUrl?.trim() || '';
+    if (!editingStaff) { // Only generate/sanitize if it's a new staff or if the field was empty
+      if (!finalFingerprintUrl) {
+        finalFingerprintUrl = generateUniqueFingerprint();
+      } else {
+        finalFingerprintUrl = sanitizeForUrl(finalFingerprintUrl);
+      }
+    }
+    // If editing, fingerprintUrl comes from existingStaff.fingerprintUrl and is not changed here.
+
+    const staffDataToSave: Omit<StaffRecord, 'id' | 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'cardsCreatedCount'> & { teamId?: string, updatedAt?: Timestamp, createdAt?: Timestamp, fingerprintUrl: string } = {
       name: newStaffForm.name,
       email: newStaffForm.email,
       role: newStaffForm.role || 'Employee',
       teamId: newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId,
       status: editingStaff ? newStaffForm.status || editingStaff.status : 'Invited',
-      fingerprintUrl: newStaffForm.fingerprintUrl || sanitizeForUrl(newStaffForm.name || `staff-${Date.now()}`),
+      fingerprintUrl: editingStaff ? editingStaff.fingerprintUrl : finalFingerprintUrl, // Use existing if editing
     };
 
     try {
       if (editingStaff) {
         const staffDocRef = doc(db, `companies/${adminUser.companyId}/staff`, editingStaff.id);
-        await updateDoc(staffDocRef, { ...staffDataToSave, updatedAt: serverTimestamp() });
+        // Do not update fingerprintUrl when editing
+        const { fingerprintUrl: _fpu, ...dataToUpdate } = staffDataToSave;
+        await updateDoc(staffDocRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
         toast({ title: "Staff Updated", description: `${newStaffForm.name} has been updated.` });
       } else {
         const staffCollectionRef = collection(db, `companies/${adminUser.companyId}/staff`);
         await addDoc(staffCollectionRef, { 
           ...staffDataToSave, 
           cardsCreatedCount: 0,
-          lastLoginAt: '-', // Or serverTimestamp() if they are "active" immediately
+          lastLoginAt: '-', 
           createdAt: serverTimestamp(), 
           updatedAt: serverTimestamp() 
         });
         toast({ title: "Staff Added", description: `${newStaffForm.name} has been added.` });
       }
       setIsAddStaffDialogOpen(false);
-      fetchStaff(); // Re-fetch to update the list
+      fetchStaff(); 
     } catch (error) {
       console.error("Error saving staff:", error);
       toast({ title: "Error Saving Staff", description: "Could not save staff details.", variant: "destructive" });
@@ -234,7 +247,7 @@ export default function UsersPage() {
       const staffDocRef = doc(db, `companies/${adminUser.companyId}/staff`, staffToDelete.id);
       await deleteDoc(staffDocRef);
       toast({ title: "Staff Deleted", description: `${staffToDelete.name} has been removed.` });
-      fetchStaff(); // Re-fetch
+      fetchStaff(); 
     } catch (error) {
       console.error("Error deleting staff:", error);
       toast({ title: "Error Deleting Staff", description: "Could not remove staff.", variant: "destructive" });
@@ -464,9 +477,12 @@ export default function UsersPage() {
                   id="staffFingerprintUrl"
                   value={newStaffForm.fingerprintUrl || ''}
                   onChange={(e) => handleFormChange('fingerprintUrl', sanitizeForUrl(e.target.value))}
-                  placeholder="e.g., alex-johnson-card (auto-generated if blank)"
+                  placeholder="e.g., alex-johnson (auto-generated if blank)"
+                  disabled={!!editingStaff} // Non-editable after creation
                 />
-                <p className="text-xs text-muted-foreground">Unique part of the card URL. Will be sanitized. e.g., /card/{newStaffForm.fingerprintUrl || 'preview'}</p>
+                <p className="text-xs text-muted-foreground">
+                  Unique part of the card URL. {editingStaff ? "Cannot be changed after creation." : "Auto-generated if blank. Will be sanitized."} e.g., /card/{newStaffForm.fingerprintUrl || 'preview'}
+                </p>
               </div>
             </div>
             <DialogFooter>
