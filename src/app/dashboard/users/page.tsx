@@ -31,9 +31,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send } from 'lucide-react';
+import { UserCog, PlusCircle, Search, Edit, Trash2, MoreVertical, Send, Link as LinkIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import type { AuthenticatedUser, UserRole, UserStatus, Team } from '@/lib/app-types';
+import type { StaffRecord, StaffRole, UserStatus, Team } from '@/lib/app-types'; // Updated to StaffRecord
+import Link from 'next/link'; // Import Link
+import { sanitizeForUrl } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,12 +56,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
-const MOCK_USERS_DATA: AuthenticatedUser[] = [
-  { id: 'user1', name: 'John Doe', email: 'john.doe@example.com', role: 'Employee', status: 'Active', teamId: 'team1', lastLoginAt: '2024-07-28 10:00 AM', cardsCreatedCount: 5, createdAt: '2023-01-15' },
-  { id: 'user2', name: 'Jane Roe', email: 'jane.roe@example.com', role: 'Manager', status: 'Active', teamId: 'team1', lastLoginAt: '2024-07-29 09:00 AM', cardsCreatedCount: 3, createdAt: '2023-01-20' },
-  { id: 'user3', name: 'Mike Chan', email: 'mike.chan@example.com', role: 'Admin', status: 'Active', teamId: 'team2', lastLoginAt: '2024-07-29 11:00 AM', cardsCreatedCount: 10, createdAt: '2023-02-01' },
-  { id: 'user4', name: 'Sarah Lee', email: 'sarah.lee@example.com', role: 'Employee', status: 'Invited', teamId: 'team2', lastLoginAt: '-', cardsCreatedCount: 0, createdAt: '2024-07-25' },
-  { id: 'user5', name: 'Tom Wilson', email: 'tom.wilson@example.com', role: 'Employee', status: 'Inactive', teamId: 'team1', lastLoginAt: '2024-06-01 03:00 PM', cardsCreatedCount: 1, createdAt: '2023-03-10' },
+// MOCK_USERS_DATA now represents StaffRecord[]
+const MOCK_STAFF_DATA: StaffRecord[] = [
+  { id: 'user1', name: 'John Doe', email: 'john.doe@example.com', role: 'Employee', status: 'Active', teamId: 'team1', lastLoginAt: '2024-07-28 10:00 AM', cardsCreatedCount: 5, createdAt: '2023-01-15', fingerprintUrl: 'john-doe-staff-card' },
+  { id: 'user2', name: 'Jane Roe', email: 'jane.roe@example.com', role: 'Manager', status: 'Active', teamId: 'team1', lastLoginAt: '2024-07-29 09:00 AM', cardsCreatedCount: 3, createdAt: '2023-01-20', fingerprintUrl: 'jane-roe-manager-card' },
+  { id: 'user3', name: 'Mike Chan', email: 'mike.chan@example.com', role: 'Employee', status: 'Active', teamId: 'team2', lastLoginAt: '2024-07-29 11:00 AM', cardsCreatedCount: 10, createdAt: '2023-02-01', fingerprintUrl: 'mike-chan-card' },
+  { id: 'user4', name: 'Sarah Lee', email: 'sarah.lee@example.com', role: 'Employee', status: 'Invited', teamId: 'team2', lastLoginAt: '-', cardsCreatedCount: 0, createdAt: '2024-07-25', fingerprintUrl: 'sarah-lee-pending' },
+  { id: 'user5', name: 'Tom Wilson', email: 'tom.wilson@example.com', role: 'Contractor', status: 'Inactive', teamId: 'team1', lastLoginAt: '2024-06-01 03:00 PM', cardsCreatedCount: 1, createdAt: '2023-03-10', fingerprintUrl: 'tom-wilson-inactive' },
 ];
 
 const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
@@ -68,108 +71,121 @@ const MOCK_TEAMS_FOR_SELECT: Pick<Team, 'id' | 'name'>[] = [
   { id: 'team3', name: 'Engineering Squad Beta' },
 ];
 
-const initialNewUserState: Partial<AuthenticatedUser> & { teamId: string } = {
+// Form state now aligns more with StaffRecord properties
+const initialNewStaffState: Partial<StaffRecord> & { teamId: string } = {
     name: '',
     email: '',
-    role: 'Employee',
+    role: 'Employee', // Default StaffRole
     teamId: MOCK_TEAMS_FOR_SELECT[0]?.id || 'no-team',
+    fingerprintUrl: '', // This would likely be auto-generated in a real backend
 };
 
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<AuthenticatedUser[]>(MOCK_USERS_DATA);
+  const [staffList, setStaffList] = useState<StaffRecord[]>(MOCK_STAFF_DATA);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
-  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
-  const [newUserForm, setNewUserForm] = useState<Partial<AuthenticatedUser> & { teamId: string }>(initialNewUserState);
-  const [editingUser, setEditingUser] = useState<AuthenticatedUser | null>(null);
-  const [isDeleteUserAlertOpen, setIsDeleteUserAlertOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<AuthenticatedUser | null>(null);
+  const [isAddStaffDialogOpen, setIsAddStaffDialogOpen] = useState(false);
+  const [newStaffForm, setNewStaffForm] = useState<Partial<StaffRecord> & { teamId: string }>(initialNewStaffState);
+  const [editingStaff, setEditingStaff] = useState<StaffRecord | null>(null);
+  const [isDeleteStaffAlertOpen, setIsDeleteStaffAlertOpen] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState<StaffRecord | null>(null);
 
 
-  const filteredUsers = useMemo(() => {
-    return users.filter(user =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStaffList = useMemo(() => {
+    return staffList.filter(staff =>
+      staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      staff.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [users, searchTerm]);
+  }, [staffList, searchTerm]);
 
-  const handleOpenAddUserDialog = (userToEdit: AuthenticatedUser | null = null) => {
-    if (userToEdit) {
-      setEditingUser(userToEdit);
-      setNewUserForm({
-        name: userToEdit.name,
-        email: userToEdit.email,
-        role: userToEdit.role,
-        teamId: userToEdit.teamId || 'no-team', 
+  const handleOpenAddStaffDialog = (staffToEdit: StaffRecord | null = null) => {
+    if (staffToEdit) {
+      setEditingStaff(staffToEdit);
+      setNewStaffForm({
+        name: staffToEdit.name,
+        email: staffToEdit.email,
+        role: staffToEdit.role,
+        teamId: staffToEdit.teamId || 'no-team', 
+        fingerprintUrl: staffToEdit.fingerprintUrl, // Include for editing consistency
       });
     } else {
-      setEditingUser(null);
-      setNewUserForm(initialNewUserState);
+      setEditingStaff(null);
+      const defaultFingerprint = `new-staff-${Date.now().toString().slice(-5)}`;
+      setNewStaffForm({...initialNewStaffState, fingerprintUrl: sanitizeForUrl(defaultFingerprint) });
     }
-    setIsAddUserDialogOpen(true);
+    setIsAddStaffDialogOpen(true);
   };
   
-  const handleFormChange = (field: keyof (Partial<AuthenticatedUser> & { teamId: string }), value: string | UserRole | UserStatus) => {
-    setNewUserForm(prev => ({ ...prev, [field]: value }));
+  const handleFormChange = (field: keyof (Partial<StaffRecord> & { teamId: string }), value: string | StaffRole | UserStatus) => {
+    setNewStaffForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveUser = (event: React.FormEvent) => {
+  const handleSaveStaff = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newUserForm.name?.trim() || !newUserForm.email?.trim()) {
+    if (!newStaffForm.name?.trim() || !newStaffForm.email?.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please fill out Name and Email for the user.",
+        description: "Please fill out Name and Email for the staff member.",
         variant: "destructive",
       });
       return;
     }
 
-    const userTeamIdToSave = newUserForm.teamId === 'no-team' ? undefined : newUserForm.teamId;
+    const staffTeamIdToSave = newStaffForm.teamId === 'no-team' ? undefined : newStaffForm.teamId;
+    const fingerprint = newStaffForm.fingerprintUrl || sanitizeForUrl(newStaffForm.name || 'new-staff');
 
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...editingUser, ...newUserForm, teamId: userTeamIdToSave, updatedAt: new Date().toISOString().split('T')[0] } as AuthenticatedUser : u));
+
+    if (editingStaff) {
+      setStaffList(staffList.map(s => s.id === editingStaff.id ? { 
+          ...editingStaff, 
+          ...newStaffForm, 
+          teamId: staffTeamIdToSave, 
+          fingerprintUrl: newStaffForm.fingerprintUrl || editingStaff.fingerprintUrl, // Keep existing if not changed
+          updatedAt: new Date().toISOString().split('T')[0] 
+        } as StaffRecord : s));
       toast({
-        title: "User Updated!",
-        description: `User "${newUserForm.name}" has been successfully updated.`,
+        title: "Staff Member Updated!",
+        description: `Staff member "${newStaffForm.name}" has been successfully updated.`,
       });
     } else {
-      const newUser: AuthenticatedUser = {
-        id: `user-${Date.now()}`,
-        name: newUserForm.name || '',
-        email: newUserForm.email || '',
-        role: newUserForm.role || 'Employee',
-        teamId: userTeamIdToSave, 
+      const newStaffMember: StaffRecord = {
+        id: `staff-${Date.now()}`,
+        name: newStaffForm.name || '',
+        email: newStaffForm.email || '',
+        role: newStaffForm.role || 'Employee',
+        teamId: staffTeamIdToSave, 
         status: 'Invited', 
+        fingerprintUrl: fingerprint,
         createdAt: new Date().toISOString().split('T')[0], 
-        cardsCreatedCount: 0,
-        lastLoginAt: '-',
+        cardsCreatedCount: 0, // Default for new staff
+        lastLoginAt: '-', // Staff might not log in
       };
 
-      setUsers(prevUsers => [newUser, ...prevUsers]);
+      setStaffList(prevStaff => [newStaffMember, ...prevStaff]);
       toast({
-        title: "User Added!",
-        description: `User "${newUser.name}" has been invited. An access code would be generated and sent.`,
+        title: "Staff Member Added!",
+        description: `Staff member "${newStaffMember.name}" has been added. Their card URL is /card/${newStaffMember.fingerprintUrl}`,
       });
     }
-    setIsAddUserDialogOpen(false);
+    setIsAddStaffDialogOpen(false);
   };
   
-  const confirmDeleteUser = (user: AuthenticatedUser) => {
-    setUserToDelete(user);
-    setIsDeleteUserAlertOpen(true);
+  const confirmDeleteStaff = (staff: StaffRecord) => {
+    setStaffToDelete(staff);
+    setIsDeleteStaffAlertOpen(true);
   };
   
-  const handleDeleteUser = () => {
-    if (!userToDelete) return;
-    setUsers(users.filter(user => user.id !== userToDelete.id));
+  const handleDeleteStaff = () => {
+    if (!staffToDelete) return;
+    setStaffList(staffList.filter(staff => staff.id !== staffToDelete.id));
     toast({
-        title: "User Deleted",
-        description: `User "${userToDelete.name}" has been removed. (Simulation)`,
+        title: "Staff Member Deleted",
+        description: `Staff member "${staffToDelete.name}" has been removed. (Simulation)`,
     });
-    setIsDeleteUserAlertOpen(false);
-    setUserToDelete(null);
+    setIsDeleteStaffAlertOpen(false);
+    setStaffToDelete(null);
   };
 
   const getTeamNameById = (teamId?: string) => {
@@ -192,17 +208,17 @@ export default function UsersPage() {
       <CardHeader>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary"/>User Management</CardTitle>
-                <CardDescription>Manage users in your organization. Assign roles, manage access, and track onboarding.</CardDescription>
+                <CardTitle className="flex items-center"><UserCog className="mr-2 h-6 w-6 text-primary"/>Staff Management</CardTitle>
+                <CardDescription>Manage staff members in your organization. Assign roles, teams, and manage their digital card access.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenAddUserDialog()}>
-                <PlusCircle className="mr-2 h-5 w-5" /> Add New User
+            <Button onClick={() => handleOpenAddStaffDialog()}>
+                <PlusCircle className="mr-2 h-5 w-5" /> Add New Staff
             </Button>
         </div>
          <div className="mt-4 relative w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search users by name or email..." 
+            placeholder="Search staff by name or email..." 
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -219,45 +235,53 @@ export default function UsersPage() {
                 <TableHead>Role</TableHead>
                 <TableHead>Team</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Last Login</TableHead>
+                <TableHead>Card URL</TableHead> {/* New Column */}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.length > 0 ? filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell><Badge variant={user.role === 'Admin' ? 'destructive' : user.role === 'Manager' ? 'secondary' : 'outline' }>{user.role}</Badge></TableCell>
-                  <TableCell>{getTeamNameById(user.teamId)}</TableCell>
-                  <TableCell><Badge variant={getStatusVariant(user.status)}>{user.status}</Badge></TableCell>
-                  <TableCell>{user.lastLoginAt}</TableCell>
+              {filteredStaffList.length > 0 ? filteredStaffList.map((staff) => (
+                <TableRow key={staff.id}>
+                  <TableCell className="font-medium">{staff.name}</TableCell>
+                  <TableCell>{staff.email}</TableCell>
+                  <TableCell><Badge variant={staff.role === 'Manager' ? 'secondary' : 'outline' }>{staff.role}</Badge></TableCell>
+                  <TableCell>{getTeamNameById(staff.teamId)}</TableCell>
+                  <TableCell><Badge variant={getStatusVariant(staff.status)}>{staff.status}</Badge></TableCell>
+                  <TableCell>
+                    {staff.fingerprintUrl ? (
+                      <Link href={`/card/${staff.fingerprintUrl}`} target="_blank" className="text-primary hover:underline flex items-center text-xs">
+                        <LinkIcon className="mr-1 h-3 w-3" /> View Card
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">N/A</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreVertical className="h-4 w-4" />
-                           <span className="sr-only">User Actions for {user.name}</span>
+                           <span className="sr-only">Actions for {staff.name}</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenAddUserDialog(user)}>
+                        <DropdownMenuItem onClick={() => handleOpenAddStaffDialog(staff)}>
                           <Edit className="mr-2 h-4 w-4" />
-                          Edit User
+                          Edit Staff
                         </DropdownMenuItem>
-                        <DropdownMenuItem disabled={user.status === 'Active'}>
+                        <DropdownMenuItem disabled={staff.status === 'Active'}>
                           <Send className="mr-2 h-4 w-4" />
-                          Resend Invitation
+                          Resend Invitation/Setup
                         </DropdownMenuItem>
                          <DropdownMenuSeparator />
                         <DropdownMenuItem 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onClick={() => confirmDeleteUser(user)}
-                            onSelect={(e) => e.preventDefault()} // Prevents DropdownMenu from closing before Alert
+                            onClick={() => confirmDeleteStaff(staff)}
+                            onSelect={(e) => e.preventDefault()} 
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
-                          Delete User
+                          Delete Staff
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -265,8 +289,8 @@ export default function UsersPage() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    {searchTerm ? `No users found for "${searchTerm}".` : "No users yet. Click 'Add New User' to start."}
+                  <TableCell colSpan={7} className="h-24 text-center"> {/* Updated colSpan */}
+                    {searchTerm ? `No staff found for "${searchTerm}".` : "No staff members yet. Click 'Add New Staff' to start."}
                   </TableCell>
                 </TableRow>
               )}
@@ -274,66 +298,67 @@ export default function UsersPage() {
           </Table>
         </div>
       </CardContent>
-      {filteredUsers.length > 5 && (
+      {filteredStaffList.length > 5 && (
         <CardFooter className="justify-center border-t pt-4">
-          <p className="text-xs text-muted-foreground">Showing {filteredUsers.length} of {users.length} users.</p>
+          <p className="text-xs text-muted-foreground">Showing {filteredStaffList.length} of {staffList.length} staff members.</p>
         </CardFooter>
       )}
 
-      <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+      <Dialog open={isAddStaffDialogOpen} onOpenChange={setIsAddStaffDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
+            <DialogTitle>{editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
             <DialogDescription>
-              {editingUser ? `Update details for ${editingUser.name}.` : 'Fill in the details below to invite a new user to your organization.'}
+              {editingStaff ? `Update details for ${editingStaff.name}.` : 'Fill in the details below to add a new staff member.'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSaveUser}>
+          <form onSubmit={handleSaveStaff}>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="userName">Full Name</Label>
+                <Label htmlFor="staffName">Full Name</Label>
                 <Input
-                  id="userName"
-                  value={newUserForm.name || ''}
+                  id="staffName"
+                  value={newStaffForm.name || ''}
                   onChange={(e) => handleFormChange('name', e.target.value)}
                   placeholder="e.g., Alex Johnson"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="userEmail">Email Address</Label>
+                <Label htmlFor="staffEmail">Email Address</Label>
                 <Input
-                  id="userEmail"
+                  id="staffEmail"
                   type="email"
-                  value={newUserForm.email || ''}
+                  value={newStaffForm.email || ''}
                   onChange={(e) => handleFormChange('email', e.target.value)}
                   placeholder="e.g., alex.johnson@example.com"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="userRole">Role</Label>
+                <Label htmlFor="staffRole">Role in Company</Label>
                 <Select
-                  value={newUserForm.role}
-                  onValueChange={(value) => handleFormChange('role', value as UserRole)}
+                  value={newStaffForm.role}
+                  onValueChange={(value) => handleFormChange('role', value as StaffRole)}
                 >
-                  <SelectTrigger id="userRole">
+                  <SelectTrigger id="staffRole">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Employee">Employee</SelectItem>
                     <SelectItem value="Manager">Manager</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Contractor">Contractor</SelectItem>
+                    {/* Add other relevant staff roles */}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="userTeam">Assign to Team</Label>
+                <Label htmlFor="staffTeam">Assign to Team</Label>
                 <Select
-                  value={newUserForm.teamId || 'no-team'}
+                  value={newStaffForm.teamId || 'no-team'}
                   onValueChange={(value) => handleFormChange('teamId', value)} 
                 >
-                  <SelectTrigger id="userTeam">
+                  <SelectTrigger id="staffTeam">
                     <SelectValue placeholder="Select a team" />
                   </SelectTrigger>
                   <SelectContent>
@@ -344,29 +369,39 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="staffFingerprintUrl">Card URL Segment</Label>
+                <Input
+                  id="staffFingerprintUrl"
+                  value={newStaffForm.fingerprintUrl || ''}
+                  onChange={(e) => handleFormChange('fingerprintUrl', sanitizeForUrl(e.target.value))}
+                  placeholder="e.g., alex-johnson-card (auto-generated if blank)"
+                />
+                <p className="text-xs text-muted-foreground">Unique part of the card URL. Will be sanitized. e.g., /card/{newStaffForm.fingerprintUrl || 'preview'}</p>
+              </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit">{editingUser ? 'Save Changes' : 'Add User & Send Invite'}</Button>
+              <Button type="submit">{editingStaff ? 'Save Changes' : 'Add Staff Member'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteUserAlertOpen} onOpenChange={setIsDeleteUserAlertOpen}>
+      <AlertDialog open={isDeleteStaffAlertOpen} onOpenChange={setIsDeleteStaffAlertOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the user account for "{userToDelete?.name}".
+                This action cannot be undone. This will permanently delete the staff record for "{staffToDelete?.name}". Their digital card will no longer be accessible.
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser}>
-                Yes, delete user
+            <AlertDialogCancel onClick={() => setStaffToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteStaff}>
+                Yes, delete staff member
             </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

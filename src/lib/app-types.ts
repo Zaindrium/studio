@@ -17,7 +17,7 @@ export interface StaffCardData {
   profilePictureUrl?: string;
   cardBackgroundUrl?: string;
   userInfo?: string;
-  targetAudience?: string; // May or may not be relevant for admin-managed cards
+  targetAudience?: string; 
 }
 
 export interface CardDesignSettings {
@@ -28,7 +28,7 @@ export interface CardDesignSettings {
     textColor: string;
     primaryColor: string;
   };
-  qrCodeUrl: string; // This will be the unique fingerprint URL for the staff card
+  qrCodeUrl: string; 
 }
 
 // Represents an Organization/Company in Firebase
@@ -39,24 +39,21 @@ export interface CompanyProfile {
   size?: string;
   website?: string;
   address?: string;
-  // branding: logoUrl, primaryColor, etc.
-  // subscriptionPlanId: string; (Covered by useCurrentPlan for now)
-  // subscriptionStatus: 'active' | 'inactive' | 'trial';
   createdAt: string;
   updatedAt: string;
 }
 
 // Represents an Admin User in Firebase
-export type AdminRole = 'Owner' | 'Admin' | 'BillingManager'; // Example roles
-export type UserStatus = 'Active' | 'Invited' | 'Inactive'; // Re-using for admins too
+export type AdminRole = 'Owner' | 'Admin' | 'BillingManager'; // Example roles for system admins
+export type UserStatus = 'Active' | 'Invited' | 'Inactive';
 
-export interface AdminUser { // Was AuthenticatedUser
+export interface AdminUser { 
   id: string; // adminId
   companyId: string;
   name: string;
   email: string;
   emailVerified?: boolean;
-  role: AdminRole; // Specific admin roles
+  role: AdminRole; 
   status: UserStatus;
   profilePictureUrl?: string;
   lastLoginAt?: string;
@@ -65,32 +62,37 @@ export interface AdminUser { // Was AuthenticatedUser
 }
 
 // Represents a Staff Record in Firebase (managed by Admins, no login)
+// This is also used for the "Users" list in the dashboard.
+export type StaffRole = 'Employee' | 'Manager' | 'Contractor' // Roles within the company for staff
 export interface StaffRecord {
-  id: string; // staffId
-  companyId: string;
+  id: string; 
+  companyId?: string; // Optional if not strictly needed for mock display
   name: string;
-  email: string; // For contact, not login
-  title?: string;
-  team?: string; // Team name or ID
-  status: 'Active' | 'Inactive'; // Card activation status
-  uniqueNfcIdentifier?: string; // For linking to a physical NFC tag
-  fingerprintUrl: string; // e.g., {businessName}/{uniqueStaffId}/{staffInitials}
-  assignedCardId?: string; // Reference to the DigitalBusinessCardRecord
+  email: string; 
+  role: StaffRole; // Role of the staff member in the company
+  teamId?: string; // Team they belong to
+  status: UserStatus; // 'Active', 'Invited', 'Inactive' status of their card/profile
+  fingerprintUrl: string; // e.g., 'john-doe-unique-card-id' (should be URL safe)
+  uniqueNfcIdentifier?: string; 
+  assignedCardId?: string; 
+  cardsCreatedCount?: number; // For dashboard display, actual count on their assigned card
+  lastLoginAt?: string; // This might not be relevant if staff don't log in. Keep for consistency or remove.
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
+
 
 // Represents a Digital Business Card record in Firebase
 export interface DigitalBusinessCardRecord {
   id: string; // cardId
   companyId: string;
-  staffRecordId: string; // Link to StaffRecord
-  templateId?: string; // Link to CardTemplateRecord
-  customFields?: Record<string, any>; // For any overrides or additional card-specific data
-  cardData: StaffCardData; // The actual content to display on the card
-  designSettings: CardDesignSettings; // The design to apply
-  isActive: boolean; // Master switch for the card
-  nfcTagId?: string; // Physical NFC tag identifier if linked
+  staffRecordId: string; 
+  templateId?: string; 
+  customFields?: Record<string, any>; 
+  cardData: StaffCardData; 
+  designSettings: CardDesignSettings; 
+  isActive: boolean; 
+  nfcTagId?: string; 
   createdAt: string;
   updatedAt: string;
 }
@@ -101,29 +103,29 @@ export interface CardTemplateRecord {
   companyId: string;
   name: string;
   description?: string;
-  designSettings: CardDesignSettings; // Base design
-  defaultFields?: Partial<StaffCardData>; // Pre-filled fields for cards using this template
+  designSettings: CardDesignSettings; 
+  defaultFields?: Partial<StaffCardData>; 
   isDefault?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 
-export interface AccessCode { // For inviting new Admins or other purposes
+export interface AccessCode { 
     code: string;
-    userId: string; // Could be adminId
+    userId: string; 
     companyId: string;
     isUsed: boolean;
     expiresAt?: string;
     createdAt: string;
 }
 
-// Mock data for editor page, now using StaffCardData
+// AppTemplate is used to initialize the card editor (now in Generator tab)
 export interface AppTemplate {
   id: string;
   name: string;
   description: string;
-  profile: StaffCardData; // Changed from UserProfile
+  profile: StaffCardData; 
   design: CardDesignSettings;
 }
 
@@ -143,6 +145,7 @@ const defaultClassicStaffCard: StaffCardData = {
   profilePictureUrl: `https://placehold.co/100x100.png`,
   cardBackgroundUrl: ``,
   userInfo: 'Dedicated sales professional helping businesses grow.',
+  targetAudience: 'Clients and Partners',
 };
 
 const defaultClassicDesign: CardDesignSettings = {
@@ -153,7 +156,7 @@ const defaultClassicDesign: CardDesignSettings = {
     textColor: '#333333',
     primaryColor: '#3F51B5',
   },
-  qrCodeUrl: '/card/classic-default-staff', // Needs to be unique per card
+  qrCodeUrl: '/card/classic-default-staff', 
 };
 
 const creativeProfessionalStaffCard: StaffCardData = {
@@ -170,6 +173,7 @@ const creativeProfessionalStaffCard: StaffCardData = {
   profilePictureUrl: `https://placehold.co/120x120.png`,
   cardBackgroundUrl: ``,
   userInfo: 'Innovative marketing specialist driving brand engagement.',
+  targetAudience: 'Creative Community',
 };
 
 const creativeProfessionalDesign: CardDesignSettings = {
@@ -205,18 +209,16 @@ export const defaultCardDesignSettings: CardDesignSettings = defaultClassicDesig
 
 
 // For Dashboard User/Admin list display
-// Re-using UserRole and UserStatus for general user display, though AdminUser has AdminRole
-export type UserRole = 'Admin' | 'Manager' | 'Employee'; // General purpose for display in dashboard lists
-
-export interface AuthenticatedUser { // This type is used for the dashboard *logged-in admin's* mock data.
+// This specific `AuthenticatedUser` type is for the LOGGED-IN ADMIN USER's info,
+// not for the list of staff they manage. For staff, use `StaffRecord`.
+export interface AuthenticatedAdminInfo { 
   id: string;
-  companyId: string; // Company this admin belongs to
-  organizationName: string; // Company name for display
+  companyId: string; 
+  organizationName: string; 
   name: string;
   email: string;
-  role: AdminRole; // Specific admin role
+  role: AdminRole; 
   avatarUrl?: string;
-  // Other fields from AdminUser can be added as needed for the dashboard's display of the logged-in user.
 }
 
 // For Dashboard Teams list
@@ -226,7 +228,7 @@ export interface Team {
   name: string;
   description: string;
   memberUserIds?: string[];
-  manager: string; // Name of the manager
+  manager: string; 
   memberCount: number;
   defaultTemplateId?: string;
   createdAt?: string;

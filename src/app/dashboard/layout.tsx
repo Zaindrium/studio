@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import '../globals.css';
-import { Link as LinkIcon, LayoutDashboard, Users, CreditCard, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock } from 'lucide-react';
+import { Link as LinkIcon, LayoutDashboard, Users, FileText, Settings, LifeBuoy, LogOut, Building, Contact, UserCog, KeyRound, Blocks, Puzzle, ShoppingCart, Lock } from 'lucide-react';
 import {
   Sidebar,
   SidebarProvider,
@@ -22,16 +22,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
-import type { AdminUser } from '@/lib/app-types'; // Updated to AdminUser
+import type { AdminUser } from '@/lib/app-types'; 
 
 // Simulated admin user data - replace with actual auth context later
-const MOCK_ADMIN_USER: AdminUser & { organizationName: string, avatarUrl?: string } = { // Extended for display
+const MOCK_ADMIN_USER: AdminUser & { organizationName: string, avatarUrl?: string } = {
   id: "admin-user-123",
   companyId: "company-abc-789",
-  organizationName: "Example Corp", // This comes from the CompanyProfile linked to the admin
+  organizationName: "LinkUP Corp", 
   name: "Admin LoggedIn",
   email: "admin@examplecorp.com",
-  role: 'Owner', // Example admin role
+  role: 'Owner', 
   status: 'Active',
   avatarUrl: "https://placehold.co/40x40.png",
   createdAt: new Date().toISOString(),
@@ -40,17 +40,17 @@ const MOCK_ADMIN_USER: AdminUser & { organizationName: string, avatarUrl?: strin
 const sidebarNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/teams', label: 'Teams', icon: Users, isPremium: true },
-  { href: '/dashboard/users', label: 'Users', icon: UserCog }, // Managing staff/users
-  { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard }, // Admin manages staff cards
+  { href: '/dashboard/users', label: 'Users', icon: UserCog }, 
+  // { href: '/dashboard/business-cards', label: 'Business Cards', icon: CreditCard }, // Removed
   { href: '/dashboard/templates', label: 'Templates', icon: FileText },
-  { href: '/dashboard/generator', label: 'Generator', icon: Blocks, isPremium: true },
+  { href: '/dashboard/generator', label: 'Card Editor', icon: Blocks }, // Label changed, path is the same
   { href: '/dashboard/physical-cards', label: 'Physical Cards', icon: ShoppingCart, isPremium: true },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Contact },
-  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true }, // Managing other admins
+  { href: '/dashboard/administrators', label: 'Administrators', icon: Building, isPremium: true }, 
   { href: '/dashboard/roles', label: 'Roles & Permissions', icon: KeyRound, isPremium: true },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Puzzle, isPremium: true },
-  { href: '/dashboard/license', label: 'License Management', icon: CreditCard },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings }, // Company/Org settings
+  { href: '/dashboard/license', label: 'License Management', icon: ShoppingCart }, // Icon changed for consistency
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings }, 
   { href: '/dashboard/faq', label: 'FAQ', icon: LifeBuoy },
 ];
 
@@ -61,7 +61,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const adminUser = MOCK_ADMIN_USER; // Use the mock admin user
+  const adminUser = MOCK_ADMIN_USER; 
   const { currentPlan, isLoading: isPlanLoading } = useCurrentPlan();
   const [activePlan, setActivePlan] = useState<PlanId | null>(null);
 
@@ -73,8 +73,6 @@ export default function DashboardLayout({
 
   const handleLogout = () => {
     console.log("Logout clicked, redirecting to /login");
-    // Add actual logout logic here (e.g., clear tokens, call API)
-    // For now, just redirect
     router.push('/login');
   };
 
@@ -108,7 +106,7 @@ export default function DashboardLayout({
                         className={isPremiumLocked ? 'opacity-60 cursor-not-allowed hover:bg-transparent hover:text-sidebar-foreground' : ''}
                         onClick={isPremiumLocked ? (e) => {
                             e.preventDefault();
-                            router.push('/dashboard/license'); // Or /subscription
+                            router.push('/dashboard/license'); 
                         } : undefined}
                       >
                         <item.icon className="h-5 w-5" />
