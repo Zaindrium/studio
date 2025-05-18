@@ -4,8 +4,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { AdminUser, CompanyProfile, PlanId, StaffRecord, Team, Role } from '@/lib/app-types'; // Added Role
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp, Timestamp, collection, query, getDocs } from 'firebase/firestore'; // Added collection, query, getDocs
+import type { AdminUser, CompanyProfile, PlanId, StaffRecord, Team, Role } from '@/lib/app-types';
 import { APP_PLANS } from '@/lib/app-types';
 
 const DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY: PlanId = APP_PLANS.find(p => p.id === 'growth')?.id || 'growth';
@@ -45,10 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [adminListCache, setAdminListCache] = useState<AdminUser[] | null>(null);
   const [rolesListCache, setRolesListCache] = useState<Role[] | null>(null);
 
-  // Generic toast import - assuming useToast is available globally or passed down
-  // For simplicity, direct import for now, though ideally through a provider or prop
   const showToast = (title: string, description: string, variant: "default" | "destructive" = "default") => {
-    // Placeholder: in a real app, you'd call your global toast function here
     console.log(`Toast: ${title} - ${description} (${variant})`);
      if (typeof window !== 'undefined' && (window as any).toast) {
         (window as any).toast({ title, description, variant });
@@ -68,16 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (companyDocSnap.exists()) {
         const companyData = companyDocSnap.data() as CompanyProfile;
         setCompanyProfile(companyData);
-        setActivePlanId(companyData.activePlanId || LOWEST_TIER_PLAN_ID); // Default to free if not set
+        setActivePlanId(companyData.activePlanId || LOWEST_TIER_PLAN_ID);
       } else {
-        console.warn(`Company profile not found for ID: ${cid}. This might indicate an incomplete setup.`);
+        console.warn(`Company profile not found for ID: ${cid}.`);
         setCompanyProfile(null);
-        setActivePlanId(LOWEST_TIER_PLAN_ID); // Default to free if company profile is missing
+        setActivePlanId(LOWEST_TIER_PLAN_ID);
       }
     } catch (error: any) {
       console.error("Error fetching company profile:", error);
       setCompanyProfile(null);
-      setActivePlanId(LOWEST_TIER_PLAN_ID); // Default to free on error
+      setActivePlanId(LOWEST_TIER_PLAN_ID);
       if (error.code === 'permission-denied') {
         showToast("Permission Denied", "Failed to fetch company profile. Check Firestore rules.", "destructive");
       } else {
@@ -117,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     return useCallback(async (cid: string) => {
       if (!cid) {
-        setter(null); // Clear cache if no companyId
+        setter(null);
         return;
       }
       try {
@@ -128,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setter(fetchedItems);
       } catch (error: any) {
         console.error(`Error fetching ${cacheName} for cache:`, error);
-        setter([]); // Set to empty array on error to indicate fetch attempt was made
+        setter([]); 
         if (error.code === 'permission-denied') {
             showToast("Permission Denied", `Could not fetch ${cacheName}. Check Firestore rules.`, "destructive");
         }
@@ -147,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setIsInitialDataLoaded(false);
       if (user) {
-        const currentCompanyId = user.uid;
+        const currentCompanyId = user.uid; 
         setCompanyId(currentCompanyId);
         
         let fetchedAdminProfile: AdminUser | undefined;
@@ -171,11 +168,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
-            // To avoid race condition with serverTimestamp, fetch what was written or construct locally
             fetchedAdminProfile = {
                 id: user.uid,
                 ...newAdminProfileData,
-                createdAt: new Date().toISOString(), // Use current time as approximation
+                createdAt: new Date().toISOString(), 
                 updatedAt: new Date().toISOString(),
             };
             console.warn(`Admin profile for ${user.uid} not found, created a default one.`);
