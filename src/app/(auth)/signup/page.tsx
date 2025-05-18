@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { UserPlus, Mail, Key, Building, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { CompanyProfile, AdminUser, PlanId } from '@/lib/app-types';
 
@@ -35,16 +35,9 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  const handleSignupWithProvider = async (user: import('firebase/auth').User) => {
-    // This function would be called after a successful Google Sign-In
-    // For now, we assume company and admin name are not yet collected for Google flow.
-    // A more complete flow would prompt for these after Google sign-in if it's a new user.
-    
-    // For demonstration, if adminName or companyName are not set (e.g. via Google sign-up),
-    // we'd ideally prompt for them or use defaults.
-    const effectiveAdminName = adminName || user.displayName || "Google Admin";
-    const effectiveCompanyName = companyName || "My Google Company";
-
+  const handlePostAuthSetup = async (user: User, isGoogleSignUp: boolean = false) => {
+    const effectiveAdminName = isGoogleSignUp ? (user.displayName || "Google User") : adminName;
+    const effectiveCompanyName = companyName || (isGoogleSignUp ? `${effectiveAdminName}'s Company` : "My New Company");
 
     // Create Company Profile in Firestore
     const companyRef = doc(db, "companies", user.uid);
@@ -67,7 +60,7 @@ export default function SignupPage() {
       email: user.email || '',
       emailVerified: user.emailVerified,
       role: 'Owner',
-      status: 'Active', // Assume active after Google sign-in
+      status: 'Active',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -91,60 +84,32 @@ export default function SignupPage() {
     });
 
     if (password !== confirmPassword) {
-      toast({
-        title: "Password Mismatch",
-        description: "Passwords do not match. Please re-enter.",
-        variant: "destructive",
-      });
+      toast({ title: "Password Mismatch", description: "Passwords do not match.", variant: "destructive" });
+      setIsLoading(false);
+      return;
+    }
+    if (!adminName.trim() || !companyName.trim()) {
+      toast({ title: "Missing Information", description: "Please provide your name and company name.", variant: "destructive" });
       setIsLoading(false);
       return;
     }
 
-    if (!adminName.trim() || !companyName.trim()) {
-        toast({
-            title: "Missing Information",
-            description: "Please provide your name and company name.",
-            variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-    }
-
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await handleSignupWithProvider(user); // Reuse logic for Firestore document creation
-
+      await handlePostAuthSetup(userCredential.user);
     } catch (error: any) {
       console.error("Error during admin & company signup:", error);
+      let description = "Could not create your account. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
-        toast({
-          title: "Signup Failed",
-          description: "This email address is already in use. Please try logging in or use a different email.",
-          variant: "destructive",
-          duration: 7000,
-        });
+        description = "This email address is already in use. Please try logging in or use a different email.";
       } else if (error.code === 'auth/api-key-not-valid') {
-        toast({
-          title: "Firebase API Key Error",
-          description: "The Firebase API key is invalid. Please check your .env file and ensure NEXT_PUBLIC_FIREBASE_API_KEY is correct and that you've restarted your development server.",
-          variant: "destructive",
-          duration: 9000,
-        });
+        description = "Firebase API key is invalid. Please check your .env file and restart your development server.";
       } else if (error.code === 'permission-denied' || (error.message && error.message.toLowerCase().includes('permission-denied'))) {
-        toast({
-          title: "Database Permission Error",
-          description: "Could not save company or admin data. Please check your Firestore Security Rules to ensure authenticated users can write to 'companies/{userId}' and 'companies/{userId}/admins/{userId}'.",
-          variant: "destructive",
-          duration: 10000,
-        });
-      } else {
-        toast({
-          title: "Signup Failed",
-          description: error.message || "Could not create your account. Please try again.",
-          variant: "destructive",
-        });
+        description = "Database Permission Error. Check Firestore Security Rules for 'companies/{userId}' and 'companies/{userId}/admins/{userId}'.";
+      } else if (error.message) {
+        description = error.message;
       }
+      toast({ title: "Signup Failed", description, variant: "destructive", duration: 9000 });
     } finally {
       setIsLoading(false);
     }
@@ -152,26 +117,27 @@ export default function SignupPage() {
 
   const handleGoogleSignUp = async () => {
     setIsGoogleLoading(true);
-    toast({
-      title: "Signing up with Google...",
-    });
+    toast({ title: "Signing up with Google..." });
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      // After Google sign-in, we need to check if this user already exists in our Firestore admins
-      // For simplicity, this example assumes a new user will be created.
-      // A production app would check if user.uid exists in `companies/{any_company_id}/admins`
-      // or if `companies/{user.uid}` exists, to prevent duplicate company creation or link accounts.
-      await handleSignupWithProvider(user);
-
+      // If companyName or adminName aren't set (because this is the Google flow),
+      // handlePostAuthSetup will use defaults or user.displayName.
+      // For a better UX, you might prompt for companyName if it's empty after Google sign-up.
+      await handlePostAuthSetup(result.user, true);
     } catch (error: any) {
       console.error("Google Sign-Up Failed:", error);
-      toast({
-        title: "Google Sign-Up Failed",
-        description: error.message || "Could not sign up with Google. Please try again or use email/password.",
-        variant: "destructive",
-      });
+      let description = "Could not sign up with Google. Please try again or use email/password.";
+      if (error.code === 'auth/popup-closed-by-user') {
+        description = "Google Sign-Up cancelled.";
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        description = "An account already exists with this email using a different sign-in method.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        description = "This domain is not authorized for Google Sign-Up. Please check your Firebase project settings and add this domain to 'Authorized domains' under Authentication -> Settings.";
+      } else if (error.message) {
+        description = error.message;
+      }
+      toast({ title: "Google Sign-Up Failed", description, variant: "destructive", duration: 9000 });
     } finally {
       setIsGoogleLoading(false);
     }

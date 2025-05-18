@@ -5,10 +5,10 @@ import React, { useState, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Mail, Key, LogIn, HelpCircle, UserCircle } from 'lucide-react'; // Added HelpCircle
+import { Mail, Key, LogIn, HelpCircle, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'; // Added GoogleAuthProvider and signInWithPopup
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const Button = lazy(() => import("@/components/ui/button").then(m => ({ default: m.Button })));
 const Card = lazy(() => import("@/components/ui/card").then(m => ({ default: m.Card })));
@@ -19,7 +19,7 @@ const CardHeader = lazy(() => import("@/components/ui/card").then(m => ({ defaul
 const CardTitle = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardTitle })));
 const Input = lazy(() => import("@/components/ui/input").then(m => ({ default: m.Input })));
 const Label = lazy(() => import("@/components/ui/label").then(m => ({ default: m.Label })));
-const Separator = lazy(() => import("@/components/ui/separator").then(m => ({ default: m.Separator })));
+// const Separator = lazy(() => import("@/components/ui/separator").then(m => ({ default: m.Separator })));
 
 // Inline SVG for Google Icon as lucide-react doesn't have it by default.
 const GoogleIcon = () => (
@@ -58,10 +58,8 @@ export default function LoginPage() {
       let description = "Invalid email or password.";
       if (error.code === 'auth/invalid-email') {
         description = "The email address is not valid. Please check and try again.";
-      } else if (error.code === 'auth/invalid-credential') {
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         description = "Incorrect email or password. Please try again.";
-      } else if (error.code === 'auth/user-not-found') {
-        description = "No account found with this email. Please sign up or check your email.";
       } else if (error.message) {
         description = error.message;
       }
@@ -84,13 +82,12 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      // Firebase onAuthStateChanged in AuthProvider will handle redirection to dashboard
       toast({
         title: "Google Sign-In Successful!",
         description: "Redirecting to your dashboard...",
         variant: "default",
       });
-      router.push('/dashboard'); // AuthProvider will also attempt this
+      router.push('/dashboard'); 
     } catch (error: any) {
       console.error("Google Sign-In Failed:", error);
       let description = "Could not sign in with Google. Please try again.";
@@ -98,6 +95,8 @@ export default function LoginPage() {
         description = "Google Sign-In cancelled.";
       } else if (error.code === 'auth/account-exists-with-different-credential') {
         description = "An account already exists with this email using a different sign-in method.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        description = "This domain is not authorized for Google Sign-In. Please check your Firebase project settings and add this domain to 'Authorized domains' under Authentication -> Settings.";
       } else if (error.message) {
         description = error.message;
       }
@@ -105,6 +104,7 @@ export default function LoginPage() {
         title: "Google Sign-In Failed",
         description: description,
         variant: "destructive",
+        duration: 9000,
       });
     } finally {
       setIsGoogleLoading(false);
@@ -121,6 +121,7 @@ export default function LoginPage() {
       return;
     }
     // In a real app, you'd call firebase.auth().sendPasswordResetEmail(email)
+    // For now, this is simulated.
     toast({
       title: "Password Reset (Simulated)",
       description: `If an account exists for ${email}, a password reset link would be sent. (This is a simulation)`,
@@ -210,4 +211,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-
