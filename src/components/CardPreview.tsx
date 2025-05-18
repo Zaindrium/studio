@@ -4,7 +4,7 @@
 import React from 'react';
 import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
 import NextImage from 'next/image';
-import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, UserCircle2, Briefcase, Download, Building } from 'lucide-react'; // Added Building
+import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, UserCircle2, Briefcase, Download, Building } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -72,8 +72,8 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
   );
 
   const showBackgroundImage = profile.cardBackgroundUrl && 
-                              !profile.cardBackgroundUrl.startsWith('https://placehold.co') && 
-                              !profile.cardBackgroundUrl.startsWith('data:');
+                              (profile.cardBackgroundUrl.startsWith('data:') || profile.cardBackgroundUrl.startsWith('http'));
+
 
   const cardContent = (
     <div className="relative w-full h-full"> 
@@ -81,11 +81,12 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
         <NextImage
           src={profile.cardBackgroundUrl!} 
           alt={profile.name ? `${profile.name}'s card background` : "Card background"}
-          layout="fill" // Changed from fill
-          objectFit="cover" // Changed from object-cover
-          objectPosition="center" // Changed from object-center
-          className="z-0" // Removed sizes, priority for more flexibility
-          data-ai-hint="card background image"
+          layout="fill" 
+          objectFit="cover" 
+          objectPosition="center" 
+          className="z-0" 
+          data-ai-hint={design.aiHint || "abstract background"} // Use AI hint from design settings
+          priority={isPublicView}
         />
       ) : null}
       
@@ -106,7 +107,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
             design.layout === 'image-left' ? 'order-1' : '',
             design.layout === 'image-right' ? 'order-2' : ''
           )}>
-            {profile.profilePictureUrl ? (
+            {profile.profilePictureUrl && !profile.profilePictureUrl.startsWith('https://placehold.co') ? (
               <NextImage
                 src={profile.profilePictureUrl}
                 alt={profile.name || "Profile picture"}
@@ -140,7 +141,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
             design.layout === 'image-left' ? 'order-2 text-left' : '',
             design.layout === 'image-right' ? 'order-1 text-right' : ''
           )}>
-            {profile.companyLogoUrl && (
+            {profile.companyLogoUrl && !profile.companyLogoUrl.startsWith('https://placehold.co') && (
                 <div className={cn(
                     "mb-1 sm:mb-2",
                     design.layout === 'image-top' ? 'mx-auto' : '',
@@ -156,11 +157,11 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
                     />
                 </div>
             )}
-            <h2 className={cn("text-xl sm:text-2xl font-bold")} style={{...textPrimaryColorStyle, ...textShadow}}>
+            <h2 className={cn("text-xl sm:text-2xl font-bold truncate overflow-hidden")} style={{...textPrimaryColorStyle, ...textShadow}}>
               {profile.name || "Staff Name"}
             </h2>
-            {profile.title && <p className={cn("text-md sm:text-lg")} style={combinedTextStyles}>{profile.title}</p>}
-            {profile.companyName && <p className={cn("text-sm sm:text-md")} style={combinedTextStyles}><Building className="inline h-3 w-3 mr-1" style={textColorStyle} />{profile.companyName}</p>}
+            {profile.title && <p className={cn("text-md sm:text-lg truncate overflow-hidden")} style={combinedTextStyles}>{profile.title}</p>}
+            {profile.companyName && <p className={cn("text-sm sm:text-md truncate overflow-hidden")} style={combinedTextStyles}><Building className="inline h-3 w-3 mr-1" style={textColorStyle} />{profile.companyName}</p>}
           </div>
         </div>
 
@@ -177,7 +178,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
             { key: 'github', icon: Github, value: profile.github, hrefPrefix: profile.github?.includes('/') ? '' : 'https://github.com/' },
             { key: 'address', icon: MapPin, value: profile.address },
           ].map((item) => {
-            if (item.value) {
+            if (item.value && item.value.trim() !== '') { // Only render if value exists and is not just whitespace
             const IconComponent = item.icon;
             const displayValue = item.transformValue ? item.transformValue(item.value) : item.value;
             const hrefValue = item.hrefPrefix !== undefined ? ensureHttps(item.hrefPrefix + displayValue) : undefined;
@@ -200,9 +201,9 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
           return null;
           })}
 
-          {profile.userInfo && ( // Always render user info if present, public or editor
-            <div className="pt-2 mt-2 border-t w-full" style={{borderColor: design.colorScheme.primaryColor + '50'}}>
-              <h3 className="font-semibold text-sm mb-1" style={{...textPrimaryColorStyle, ...textShadow}}>About { isPublicView ? (profile.name || "Staff") : "Staff"}</h3>
+          {profile.userInfo && ( 
+            <div className="pt-2 mt-2 border-t w-full max-h-20 sm:max-h-24 overflow-y-auto" style={{borderColor: design.colorScheme.primaryColor + '50'}}>
+              <h3 className="font-semibold text-sm mb-1 sticky top-0 bg-transparent" style={{...textPrimaryColorStyle, ...textShadow}}>About { isPublicView ? (profile.name || "Staff") : "Staff"}</h3>
               <p className={cn("text-xs whitespace-pre-wrap break-words")} style={combinedTextStyles}>{profile.userInfo}</p>
             </div>
           )}
@@ -234,6 +235,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
     );
   }
 
+  // Editor preview
   return (
     <div className={cn("shadow-xl w-full overflow-hidden sticky top-6")}>
       <div className="text-2xl text-center p-4 font-semibold">Card Editor Preview</div>

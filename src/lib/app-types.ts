@@ -32,8 +32,7 @@ export interface CardDesignSettings {
     primaryColor: string; // hex
   };
   qrCodeUrl: string; // Generated based on fingerprintUrl for public card
-  // Font family customization could be added here later if needed
-  // fontFamily?: string; 
+  aiHint?: string; // For background image generation/search
 }
 
 // Represents an Organization/Company in Firebase
@@ -88,12 +87,11 @@ export interface StaffRecord {
   updatedAt?: Timestamp | string;
 }
 
-// Represents a Card Template record in Firebase (conceptual, as templates are data objects for now)
 export interface AppCardTemplate {
   id: string; // templateId
   name: string;
   description: string;
-  profile: StaffCardData;
+  profile: StaffCardData; // Placeholder profile data for the template
   design: CardDesignSettings;
 }
 
@@ -118,21 +116,22 @@ export const defaultStaffCardData: StaffCardData = {
   twitter: '',
   github: '',
   address: '',
-  profilePictureUrl: `https://placehold.co/100x100.png`,
-  cardBackgroundUrl: '',
+  profilePictureUrl: `https://placehold.co/120x120.png`,
+  cardBackgroundUrl: '', // Default to no background image, will use colorScheme
   userInfo: '',
   targetAudience: '',
 };
 
 export const defaultCardDesignSettings: CardDesignSettings = {
-  template: 'default-minimal',
+  template: 'tech-innovator', // Default to one of the new templates
   layout: 'image-left',
   colorScheme: {
-    cardBackground: '#FFFFFF',
-    textColor: '#111827', // Dark Gray
-    primaryColor: '#3B82F6', // Blue
+    cardBackground: '#1A202C', 
+    textColor: '#E2E8F0', 
+    primaryColor: '#3B82F6',
   },
   qrCodeUrl: '',
+  aiHint: 'tech abstract', // Default AI hint
 };
 
 export interface Team {
@@ -170,13 +169,13 @@ export interface TeamMember {
   id: string; // Staff ID
   name: string;
   email: string;
-  role: StaffRole; // Role within the company, not team-specific role for now
+  role: StaffRole; 
   cardsCreatedCount?: number;
   averageSharesPerCard?: number;
 }
 
 
-export interface OrganizationUser { // Might be a bit redundant with StaffRecord if users don't log in
+export interface OrganizationUser {
   id: string;
   name: string;
   email: string;
@@ -235,62 +234,62 @@ export const APP_PLANS: AppPlan[] = [
     staffIncluded: '1 (Solo)',
     features: ['1 Digital card', 'QR/NFC sharing', 'Admin dashboard access', 'Basic templates', 'VCF download'],
     userLimit: 1,
-    isBusiness: false,
-    description: "For solopreneurs, freelancers, and micro-businesses needing a professional digital presence.",
+    isBusiness: false, // This is a personal/solo plan
+    description: "For solopreneurs and individuals needing a professional digital presence.",
   },
   {
-    id: 'starter',
+    id: 'starter', // Was 'business-starter'
     name: 'Business Starter',
     price: 'R249',
     priceMonthly: 249,
     currencySymbol: 'R',
     frequency: '/ month',
     staffIncluded: 'Up to 5 Staff',
-    features: ['All Starter features', 'Up to 5 unique cards', 'Team grouping', 'Company branding and logo', 'Basic analytics'],
+    features: ['All Solo features', 'Up to 5 unique cards', 'Team grouping (basic)', 'Company branding and logo', 'Basic analytics'],
     extraStaffCost: 'R39',
     extraStaffUnit: '/month each',
     userLimit: 5,
     isBusiness: true,
-    description: "Designed for small businesses and teams looking to manage multiple digital cards with core branding.",
+    description: "Designed for small businesses and teams looking to manage multiple digital cards.",
   },
   {
-    id: 'growth',
+    id: 'growth', // Was 'business-growth'
     name: 'Business Growth',
     price: 'R499',
     priceMonthly: 499,
     currencySymbol: 'R',
     frequency: '/ month',
     staffIncluded: 'Up to 15 Staff',
-    features: ['All Business Starter features', 'AI Design Assistant', 'Advanced analytics (engagement, leads)', 'Priority email support'],
+    features: ['All Business Starter features', 'AI Design Assistant', 'Advanced analytics (engagement, leads)', 'Priority email support', 'More templates'],
     extraStaffCost: 'R35',
     extraStaffUnit: '/month each',
     userLimit: 15,
     isBusiness: true,
     popular: true,
-    description: "For growing SMEs or agencies requiring more cards, advanced features, and dedicated support.",
+    description: "For growing SMEs or agencies requiring more cards and advanced features.",
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
     price: 'Custom Quote',
-    priceMonthly: -1,
-    currencySymbol: '',
+    priceMonthly: -1, // Indicates custom pricing
+    currencySymbol: 'R', // Can still be ZAR for quote basis
     frequency: '',
     staffIncluded: '20+ Staff',
-    features: ['Everything in Growth', 'Unlimited staff (volume pricing, e.g. R25–R35/user)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
-    userLimit: Infinity, // Or a very high number if Infinity causes issues in logic
+    features: ['Everything in Growth', 'Unlimited staff (custom volume pricing)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
+    userLimit: Infinity, 
     isBusiness: true,
-    description: "Tailored solutions for large organizations and corporates with specific needs and high volume usage.",
+    description: "Tailored solutions for large organizations with specific needs and high volume usage.",
   },
 ];
 
-
-// --- NEW TEMPLATES START HERE ---
+// --- TEMPLATES START HERE ---
 
 /**
  * Template: Tech Innovator
  * Industry: Technology
  * Style: Modern, clean, dark theme with vibrant blue accents. Focus on social tech profiles.
+ * AI Hint for Background: "tech abstract"
  */
 export const techInnovatorTemplate: AppCardTemplate = {
   id: 'tech-innovator',
@@ -300,7 +299,7 @@ export const techInnovatorTemplate: AppCardTemplate = {
     name: 'Alex Turing',
     title: 'AI Research Lead',
     companyName: 'Innovate AI',
-    companyLogoUrl: `https://placehold.co/100x40.png`, // Placeholder for company logo
+    companyLogoUrl: `https://placehold.co/100x40.png`, 
     phone: '+1 555-0101',
     email: 'alex.turing@innovate.ai',
     website: 'innovate.ai/research',
@@ -309,7 +308,7 @@ export const techInnovatorTemplate: AppCardTemplate = {
     github: 'github.com/alexturing',
     address: '1 Quantum Leap, Silicon Valley, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: '', // Uses color scheme for background
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, 
     userInfo: 'Pioneering new frontiers in machine learning and ethical AI development. Seeking collaborators for impactful projects.',
     targetAudience: 'AI researchers, tech investors, potential engineering talent.',
   },
@@ -317,18 +316,20 @@ export const techInnovatorTemplate: AppCardTemplate = {
     template: 'tech-modern',
     layout: 'image-left',
     colorScheme: {
-      cardBackground: '#1A202C', // Very Dark Blue (Charcoal)
-      textColor: '#E2E8F0', // Light Gray
-      primaryColor: '#3B82F6', // Vibrant Blue (Tailwind Blue 500)
+      cardBackground: '#1A202C', 
+      textColor: '#E2E8F0', 
+      primaryColor: '#3B82F6', 
     },
-    qrCodeUrl: '', // Will be dynamically generated
+    qrCodeUrl: '', 
+    aiHint: "tech abstract",
   },
 };
 
 /**
  * Template: Legal Eagle
  * Industry: Legal
- * Style: Classic, authoritative, serif-implied (though uses sans-serif), with gold and navy accents.
+ * Style: Classic, authoritative, with gold and navy accents.
+ * AI Hint for Background: "legal professional"
  */
 export const legalEagleTemplate: AppCardTemplate = {
   id: 'legal-eagle',
@@ -347,7 +348,7 @@ export const legalEagleTemplate: AppCardTemplate = {
     github: '',
     address: 'Suite 500, Liberty Tower, New York, NY',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: '',
+    cardBackgroundUrl: `https://placehold.co/600x900.png`,
     userInfo: 'Over 20 years of experience in corporate litigation and M&A. Dedicated to achieving optimal outcomes for my clients.',
     targetAudience: 'Corporate clients, legal peers, potential high-value cases.',
   },
@@ -355,11 +356,12 @@ export const legalEagleTemplate: AppCardTemplate = {
     template: 'legal-classic',
     layout: 'image-right',
     colorScheme: {
-      cardBackground: '#FFFFFF', // Off-white
-      textColor: '#2D3748', // Dark Slate Gray
-      primaryColor: '#0A2342', // Navy Blue
+      cardBackground: '#FFFFFF', 
+      textColor: '#2D3748', 
+      primaryColor: '#0A2342', 
     },
     qrCodeUrl: '',
+    aiHint: "legal professional",
   },
 };
 
@@ -367,6 +369,7 @@ export const legalEagleTemplate: AppCardTemplate = {
  * Template: Healing Hands
  * Industry: Medical
  * Style: Clean, trustworthy, with calming blue and green tones.
+ * AI Hint for Background: "medical healthcare"
  */
 export const healingHandsTemplate: AppCardTemplate = {
   id: 'healing-hands',
@@ -385,7 +388,7 @@ export const healingHandsTemplate: AppCardTemplate = {
     github: '',
     address: '123 Health Way, Medicity, TX',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: '',
+    cardBackgroundUrl: `https://placehold.co/600x900.png`,
     userInfo: 'Board-certified cardiologist specializing in preventative care and cardiac rehabilitation. Committed to patient wellness.',
     targetAudience: 'Patients, referring physicians, medical colleagues.',
   },
@@ -393,18 +396,20 @@ export const healingHandsTemplate: AppCardTemplate = {
     template: 'medical-clean',
     layout: 'image-left',
     colorScheme: {
-      cardBackground: '#F0F9FF', // Very Light Blue
-      textColor: '#1E40AF', // Dark Blue
-      primaryColor: '#10B981', // Emerald Green
+      cardBackground: '#F0F9FF', 
+      textColor: '#1E40AF', 
+      primaryColor: '#10B981', 
     },
     qrCodeUrl: '',
+    aiHint: "medical healthcare",
   },
 };
 
 /**
  * Template: Creative Spark
  * Industry: Creative
- * Style: Vibrant, dynamic, allows for strong imagery (background or photo).
+ * Style: Vibrant, dynamic, allows for strong imagery.
+ * AI Hint for Background: "creative artistic"
  */
 export const creativeSparkTemplate: AppCardTemplate = {
   id: 'creative-spark',
@@ -423,7 +428,7 @@ export const creativeSparkTemplate: AppCardTemplate = {
     github: 'github.com/leomax',
     address: 'The Art Factory, Brooklyn, NY',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Encourages image
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, 
     userInfo: 'Transforming ideas into visual stories. Specializing in branding, illustration, and web design. Let\'s create something amazing!',
     targetAudience: 'Clients seeking design services, art directors, collaborators.',
   },
@@ -431,18 +436,20 @@ export const creativeSparkTemplate: AppCardTemplate = {
     template: 'creative-vibrant',
     layout: 'image-top',
     colorScheme: {
-      cardBackground: '#4A5568', // Medium Gray (can be overridden by bg image)
-      textColor: '#F7FAFC', // Light Gray (for good contrast on dark/image bg)
-      primaryColor: '#DD6B20', // Orange
+      cardBackground: '#4A5568', 
+      textColor: '#F7FAFC', 
+      primaryColor: '#DD6B20', 
     },
     qrCodeUrl: '',
+    aiHint: "creative artistic",
   },
 };
 
 /**
  * Template: Solid Foundation
  * Industry: Construction
- * Style: Rugged, dependable, with earthy tones and clear information.
+ * Style: Rugged, dependable, with earthy tones.
+ * AI Hint for Background: "construction build"
  */
 export const solidFoundationTemplate: AppCardTemplate = {
   id: 'solid-foundation',
@@ -461,7 +468,7 @@ export const solidFoundationTemplate: AppCardTemplate = {
     github: '',
     address: '456 Builder Rd, Concreton, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: '',
+    cardBackgroundUrl: `https://placehold.co/600x900.png`,
     userInfo: 'Building dreams from the ground up. Quality craftsmanship and reliable project management for residential and commercial projects.',
     targetAudience: 'Homeowners, property developers, architects.',
   },
@@ -469,18 +476,20 @@ export const solidFoundationTemplate: AppCardTemplate = {
     template: 'construction-rugged',
     layout: 'image-right',
     colorScheme: {
-      cardBackground: '#E2E8F0', // Light Gray
-      textColor: '#2D3748', // Dark Slate Gray
-      primaryColor: '#975A16', // Brown/Bronze
+      cardBackground: '#E2E8F0', 
+      textColor: '#2D3748', 
+      primaryColor: '#975A16', 
     },
     qrCodeUrl: '',
+    aiHint: "construction build",
   },
 };
 
 /**
  * Template: Dream Weaver
  * Industry: Real Estate
- * Style: Elegant, inviting, with focus on property and contact.
+ * Style: Elegant, inviting, focus on property.
+ * AI Hint for Background: "real estate home"
  */
 export const dreamWeaverTemplate: AppCardTemplate = {
   id: 'dream-weaver',
@@ -499,7 +508,7 @@ export const dreamWeaverTemplate: AppCardTemplate = {
     github: '',
     address: '789 Realty Ave, Suburbia, FL',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Suggests a nice property photo
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, 
     userInfo: 'Your trusted partner in finding the perfect home. Local market expert with a passion for helping families achieve their dreams.',
     targetAudience: 'Home buyers, sellers, property investors.',
   },
@@ -508,10 +517,11 @@ export const dreamWeaverTemplate: AppCardTemplate = {
     layout: 'image-left',
     colorScheme: {
       cardBackground: '#FFFFFF',
-      textColor: '#4A5568', // Medium Gray
-      primaryColor: '#2F855A', // Dark Green
+      textColor: '#4A5568', 
+      primaryColor: '#2F855A', 
     },
     qrCodeUrl: '',
+    aiHint: "real estate home",
   },
 };
 
@@ -519,6 +529,7 @@ export const dreamWeaverTemplate: AppCardTemplate = {
  * Template: Welcome Host
  * Industry: Hospitality
  * Style: Warm, friendly, service-oriented.
+ * AI Hint for Background: "hospitality welcome"
  */
 export const welcomeHostTemplate: AppCardTemplate = {
   id: 'welcome-host',
@@ -537,7 +548,7 @@ export const welcomeHostTemplate: AppCardTemplate = {
     github: '',
     address: '1 Paradise Ln, Resort City, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: '',
+    cardBackgroundUrl: `https://placehold.co/600x900.png`,
     userInfo: 'Ensuring every guest has an unforgettable experience. Dedicated to excellence in service and hospitality management.',
     targetAudience: 'Hotel guests, event planners, corporate clients.',
   },
@@ -545,18 +556,20 @@ export const welcomeHostTemplate: AppCardTemplate = {
     template: 'hospitality-warm',
     layout: 'image-top',
     colorScheme: {
-      cardBackground: '#FFFBEB', // Light Yellow/Cream
-      textColor: '#7B341E', // Brown
-      primaryColor: '#C05621', // Dark Orange
+      cardBackground: '#FFFBEB', 
+      textColor: '#7B341E', 
+      primaryColor: '#C05621', 
     },
     qrCodeUrl: '',
+    aiHint: "hospitality welcome",
   },
 };
 
 /**
  * Template: Knowledge Builder
  * Industry: Education
- * Style: Clean, accessible, with a focus on clarity and expertise.
+ * Style: Clean, accessible, focus on clarity.
+ * AI Hint for Background: "education academic"
  */
 export const knowledgeBuilderTemplate: AppCardTemplate = {
   id: 'knowledge-builder',
@@ -575,7 +588,7 @@ export const knowledgeBuilderTemplate: AppCardTemplate = {
     github: '',
     address: 'Dept. of Physics, 1 Scholar Way, Academia, MA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Subtle abstract or texture
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, 
     userInfo: 'Astrophysicist researching dark matter and galaxy formation. Passionate about teaching and science communication.',
     targetAudience: 'Students, academic peers, research institutions, science enthusiasts.',
   },
@@ -583,18 +596,20 @@ export const knowledgeBuilderTemplate: AppCardTemplate = {
     template: 'education-academic',
     layout: 'image-left',
     colorScheme: {
-      cardBackground: '#F7FAFC', // Very Light Gray
-      textColor: '#2D3748', // Dark Slate Gray
-      primaryColor: '#4299E1', // Blue
+      cardBackground: '#F7FAFC', 
+      textColor: '#2D3748', 
+      primaryColor: '#4299E1', 
     },
     qrCodeUrl: '',
+    aiHint: "education academic",
   },
 };
 
 /**
  * Template: Financial Advisor
  * Industry: Finance
- * Style: Secure, trustworthy, sophisticated with dark blues or grays.
+ * Style: Secure, trustworthy, sophisticated.
+ * AI Hint for Background: "finance professional"
  */
 export const financialAdvisorTemplate: AppCardTemplate = {
   id: 'financial-advisor',
@@ -613,7 +628,7 @@ export const financialAdvisorTemplate: AppCardTemplate = {
     github: '',
     address: 'Suite 101, Finance Plaza, Wall Street, NY',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: '',
+    cardBackgroundUrl: `https://placehold.co/600x900.png`,
     userInfo: 'Helping individuals and families achieve their financial goals through personalized planning and investment strategies.',
     targetAudience: 'Potential clients, investors, financial partners.',
   },
@@ -621,18 +636,20 @@ export const financialAdvisorTemplate: AppCardTemplate = {
     template: 'finance-secure',
     layout: 'image-right',
     colorScheme: {
-      cardBackground: '#0A2342', // Deep Navy
-      textColor: '#EBF8FF', // Very Light Blue/Off-white
-      primaryColor: '#D69E2E', // Gold/Bronze accent
+      cardBackground: '#0A2342', 
+      textColor: '#EBF8FF', 
+      primaryColor: '#D69E2E', 
     },
     qrCodeUrl: '',
+    aiHint: "finance professional",
   },
 };
 
 /**
  * Template: Wellness Guru
  * Industry: Wellness
- * Style: Natural, calming, organic feel with greens and earth tones.
+ * Style: Natural, calming, organic feel.
+ * AI Hint for Background: "wellness nature"
  */
 export const wellnessGuruTemplate: AppCardTemplate = {
   id: 'wellness-guru',
@@ -651,7 +668,7 @@ export const wellnessGuruTemplate: AppCardTemplate = {
     github: '',
     address: 'The Zen Den, 1 Peaceful Path, Harmony, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Suggests nature or calm texture
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, 
     userInfo: 'Guiding you on your journey to balance and well-being through yoga, meditation, and mindful living practices.',
     targetAudience: 'Individuals seeking wellness services, yoga students, holistic health community.',
   },
@@ -659,11 +676,12 @@ export const wellnessGuruTemplate: AppCardTemplate = {
     template: 'wellness-natural',
     layout: 'image-top',
     colorScheme: {
-      cardBackground: '#F0FFF4', // Honeydew (Very Light Green)
-      textColor: '#2F855A', // Dark Green
-      primaryColor: '#9AE6B4', // Lighter Green
+      cardBackground: '#F0FFF4', 
+      textColor: '#2F855A', 
+      primaryColor: '#9AE6B4', 
     },
     qrCodeUrl: '',
+    aiHint: "wellness nature",
   },
 };
 
@@ -680,5 +698,3 @@ export const APP_TEMPLATES: AppCardTemplate[] = [
   financialAdvisorTemplate,
   wellnessGuruTemplate,
 ];
-
-// --- NEW TEMPLATES END HERE ---
