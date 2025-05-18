@@ -61,6 +61,9 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
 
   React.useEffect(() => {
     const subscription = form.watch((value) => {
+      // This callback updates the parent state on every form change.
+      // This is a common pattern but can lead to frequent re-renders.
+      // For more complex forms, consider debouncing or updating on blur/submit.
       onProfileChange(value as Partial<StaffCardData>); // Updated to StaffCardData
     });
     return () => subscription.unsubscribe();
@@ -228,7 +231,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                 <FormItem>
                   <FormLabel className="flex items-center"><ImageIcon className="mr-2 h-4 w-4" />Profile Picture</FormLabel>
                   <FormControl>
-                    <>
+                    <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                       <Input
                         type="file"
                         accept="image/*"
@@ -246,7 +249,18 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                         <UploadCloud className="mr-2 h-4 w-4" />
                         Upload Profile Photo
                       </Button>
-                    </>
+                      {form.watch('profilePictureUrl') && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => form.setValue('profilePictureUrl', '')}
+                          className="w-full sm:w-auto"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Remove Photo
+                        </Button>
+                      )}
+                    </div>
                   </FormControl>
                   <FormDescription>
                     {form.watch('profilePictureUrl') && typeof form.watch('profilePictureUrl') === 'string' && !form.watch('profilePictureUrl').startsWith('data:') ?
