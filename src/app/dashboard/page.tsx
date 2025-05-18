@@ -10,8 +10,6 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLe
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
-// Removed MOCK_ANALYTICS_DATA and weeklyActivityData
-
 const chartConfig = {
   views: { label: "Views", color: "hsl(var(--chart-1))" },
   scans: { label: "Scans", color: "hsl(var(--chart-2))" },
@@ -153,7 +151,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Link href="/dashboard/license" passHref>
-                <Button className="w-full mt-2" asChild><a>Manage Subscription</a></Button>
+                <Button className="w-full mt-2" asChild>Manage Subscription</Button>
             </Link>
           </CardContent>
         </Card>
