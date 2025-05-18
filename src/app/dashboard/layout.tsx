@@ -25,7 +25,7 @@ import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
 import { useAuth } from '@/contexts/auth-context';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Skeleton } from '@/components/ui/skeleton';
+import { APP_PLANS } from '@/lib/app-types'; // For defaulting plan in case of null
 
 const sidebarNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -50,18 +50,18 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, loading: authLoading, companyId } = useAuth();
-  const { currentPlan, isLoading: isPlanLoading } = useCurrentPlan();
-  const [activePlan, setActivePlan] = useState<PlanId | null>(null);
+  const { currentUser, loading: authLoading, companyProfile } = useAuth();
+  const { currentPlan: planFromHook, isLoading: isPlanLoading } = useCurrentPlan();
+  const [activePlanForUI, setActivePlanForUI] = useState<PlanId | null>(null);
 
   const adminUser = currentUser?.adminProfile;
-  const organizationName = adminUser?.companyName || (currentUser?.email ? 'Your Company' : 'LinkUP');
+  const organizationName = companyProfile?.name || (currentUser?.email ? 'Your Company' : 'LinkUP');
 
   useEffect(() => {
-    if (!isPlanLoading && currentPlan) {
-      setActivePlan(currentPlan);
+    if (!isPlanLoading) {
+      setActivePlanForUI(planFromHook || (APP_PLANS.find(p => p.id === 'free')?.id || 'free'));
     }
-  }, [currentPlan, isPlanLoading]);
+  }, [planFromHook, isPlanLoading]);
 
   const handleLogout = async () => {
     try {
@@ -69,6 +69,7 @@ export default function DashboardLayout({
       router.push('/login');
     } catch (error) {
       console.error("Logout failed:", error);
+      // Optionally add a toast notification for logout failure
     }
   };
 
@@ -87,7 +88,6 @@ export default function DashboardLayout({
   }
 
   if (!currentUser) {
-    // This state will likely only be shown briefly before the useEffect above redirects.
     return (
         <div className="flex min-h-screen bg-background text-foreground items-center justify-center">
             <p>Redirecting to login...</p>
@@ -96,7 +96,7 @@ export default function DashboardLayout({
   }
   
   const displayedAdminName = adminUser?.name || currentUser?.displayName || currentUser?.email || "Admin";
-  const avatarFallback = displayedAdminName.charAt(0).toUpperCase();
+  const avatarFallback = displayedAdminName?.[0]?.toUpperCase() || 'A';
 
   return (
     <SidebarProvider defaultOpen>
@@ -111,7 +111,7 @@ export default function DashboardLayout({
           <SidebarContent className="p-2">
             <SidebarMenu>
               {sidebarNavItems.map((item) => {
-                const isPremiumLocked = activePlan === 'free' && item.isPremium;
+                const isPremiumLocked = activePlanForUI === 'free' && item.isPremium;
                 const tooltipText = isPremiumLocked ? `Upgrade to unlock ${item.label}` : item.label;
                 return (
                   <SidebarMenuItem key={item.href}>
