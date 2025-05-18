@@ -5,14 +5,13 @@ import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { UserProfileForm } from '@/components/UserProfileForm';
 import { CardPreview } from '@/components/CardPreview';
-import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
-import { defaultStaffCardData, defaultCardDesignSettings, APP_TEMPLATES } from '@/lib/app-types'; // Import APP_TEMPLATES
+import type { StaffCardData, CardDesignSettings, AppTemplate } from '@/lib/app-types'; // Added AppTemplate
+import { APP_TEMPLATES, defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types'; // Import APP_TEMPLATES
 import { sanitizeForUrl } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Blocks } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-// TemplatePicker is not being used for now, so import can be removed if not re-added
-// import { TemplatePicker } from '@/components/TemplatePicker'; 
+import { TemplatePicker } from '@/components/TemplatePicker'; // Import TemplatePicker
 
 const CardDesigner = dynamic(() => import('@/components/CardDesigner').then(mod => mod.CardDesigner), {
   loading: () => <Skeleton className="h-[400px] w-full rounded-lg" />,
@@ -25,24 +24,25 @@ const ShareCard = dynamic(() => import('@/components/ShareCard').then(mod => mod
 });
 
 export default function GeneratorPage() {
-  // Initialize with the first template from APP_TEMPLATES or defaults if empty
-  const initialTemplate = APP_TEMPLATES.length > 0 ? APP_TEMPLATES[0] : { profile: defaultStaffCardData, design: defaultCardDesignSettings };
+  const initialTemplate = APP_TEMPLATES.length > 0 ? APP_TEMPLATES[0] : { id: 'default', name: 'Default', description: 'Default starting point', profile: defaultStaffCardData, design: defaultCardDesignSettings };
 
   const [staffCardProfile, setStaffCardProfile] = useState<StaffCardData>(initialTemplate.profile);
   const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
+  const [currentTemplateId, setCurrentTemplateId] = useState<string>(initialTemplate.id);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    // Set initial state from the chosen template
-    setStaffCardProfile(initialTemplate.profile);
-    setCardDesign(initialTemplate.design);
-  }, [initialTemplate.profile, initialTemplate.design]); // Depend on initialTemplate fields
+    // Load the profile and design from the initial/current template
+    const selectedTemplate = APP_TEMPLATES.find(t => t.id === currentTemplateId) || initialTemplate;
+    setStaffCardProfile(selectedTemplate.profile);
+    setCardDesign(selectedTemplate.design);
+  }, [currentTemplateId, initialTemplate]);
 
   useEffect(() => {
     if (isClient && staffCardProfile.name) {
       const cardIdentifier = sanitizeForUrl(staffCardProfile.name);
-      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}-preview`;
+      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}-preview`; // Using a preview convention
       setCardDesign(prev => {
         if (prev.qrCodeUrl !== newQrCodeUrl) {
           return { ...prev, qrCodeUrl: newQrCodeUrl };
@@ -110,6 +110,13 @@ export default function GeneratorPage() {
     handleProfileChange(aiData);
   }, [handleProfileChange]);
 
+  const handleTemplateSelect = (templateId: string) => {
+    const selectedTemplate = APP_TEMPLATES.find(t => t.id === templateId);
+    if (selectedTemplate) {
+      setCurrentTemplateId(templateId); // This will trigger the useEffect to update profile and design
+    }
+  };
+
 
   if (!isClient) {
     return (
@@ -149,22 +156,13 @@ export default function GeneratorPage() {
           </CardHeader>
         </Card>
 
-        {/* 
-          Future: If a template picker is desired again, it could be re-added here:
-          <TemplatePicker 
+        <TemplatePicker 
             templates={APP_TEMPLATES} 
-            currentTemplateId={cardDesign.template} 
-            onTemplateSelect={(templateId) => {
-              const selected = APP_TEMPLATES.find(t => t.id === templateId);
-              if (selected) {
-                setStaffCardProfile(selected.profile);
-                setCardDesign(selected.design);
-              }
-            }} 
-          /> 
-        */}
+            currentTemplateId={currentTemplateId} 
+            onTemplateSelect={handleTemplateSelect}
+        /> 
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mt-8">
           <div className="lg:col-span-2 space-y-8">
             <UserProfileForm profile={staffCardProfile} onProfileChange={handleProfileChange} />
              <Suspense fallback={<Skeleton className="h-[400px] w-full rounded-lg" />}>
