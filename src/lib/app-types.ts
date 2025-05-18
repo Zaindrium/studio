@@ -9,6 +9,7 @@ export interface StaffCardData {
   name: string;
   title: string;
   companyName?: string; // Company name on the card
+  companyLogoUrl?: string; // Company logo on the card
   phone?: string;
   email: string;
   website?: string;
@@ -37,11 +38,12 @@ export interface CardDesignSettings {
 export interface CompanyProfile {
   id: string; // companyId
   name: string;
+  logoUrl?: string; // URL for the company logo
   industry?: string;
   size?: string;
   website?: string;
   address?: string;
-  activePlanId: PlanId; // Added to store the current plan
+  activePlanId: PlanId;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
@@ -60,7 +62,7 @@ export interface AdminUser {
   role: AdminRole;
   status: UserStatus;
   profilePictureUrl?: string;
-  lastLoginAt?: Timestamp | string | null; // Allow null
+  lastLoginAt?: Timestamp | string | null;
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
@@ -78,8 +80,8 @@ export interface StaffRecord {
   uniqueNfcIdentifier?: string; // For NFC card hardware
   cardDisplayData: StaffCardData;
   designSettings: CardDesignSettings;
-  cardsCreatedCount?: number;
-  lastLoginAt?: Timestamp | string | null; // Allow null
+  cardsCreatedCount?: number; // This might be redundant if each staff has one card
+  lastLoginAt?: Timestamp | string | null;
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
@@ -109,6 +111,7 @@ export const defaultStaffCardData: StaffCardData = {
   name: '',
   title: '',
   companyName: '',
+  companyLogoUrl: '',
   phone: '',
   email: '',
   website: '',
@@ -140,9 +143,9 @@ export interface Team {
   managerId?: string;
   managerName?: string;
   memberCount: number;
-  memberUserIds?: string[]; // Added to store member IDs directly on the team
-  assignedTemplates?: AssignedTemplate[]; // Placeholder for future template assignment
-  teamMetrics?: TeamMetrics; // Placeholder for team-specific aggregated metrics
+  memberUserIds?: string[];
+  assignedTemplates?: AssignedTemplate[];
+  teamMetrics?: TeamMetrics;
   defaultTemplateId?: string;
   createdAt?: Timestamp | string;
   updatedAt?: Timestamp | string;
@@ -160,11 +163,11 @@ export interface TeamMetrics {
   activeMembers: number;
 }
 
-export interface OrganizationUser { // For selecting managers or adding to teams
+export interface OrganizationUser {
   id: string;
   name: string;
   email: string;
-  role?: StaffRole | AdminRole; // Can be either
+  role?: StaffRole | AdminRole;
 }
 
 export interface ContactInfo {
@@ -177,3 +180,80 @@ export interface ContactInfo {
   submittedFromCardId?: string;
   submittedAt: Timestamp | string;
 }
+
+export interface AppPlan {
+  id: PlanId;
+  name: string;
+  price: string; // e.g., "R59" or "Contact Us"
+  priceMonthly: number; // Numeric price for calculations or Stripe, -1 for "Contact Us"
+  currencySymbol: string; // e.g., "R", "$"
+  frequency: string; // e.g., "/ month"
+  staffIncluded: string; // e.g., "1 (Solo)", "Up to 5"
+  features: string[];
+  extraStaffCost?: string; // e.g., "R39"
+  extraStaffUnit?: string; // e.g., "/month each"
+  userLimit: number; // Numeric limit for logic (derived from staffIncluded)
+  isBusiness: boolean;
+  popular?: boolean;
+  description?: string; // Short description of the plan
+}
+
+export const APP_PLANS: AppPlan[] = [
+  {
+    id: 'free',
+    name: 'Starter',
+    price: 'R59',
+    priceMonthly: 59,
+    currencySymbol: 'R',
+    frequency: '/ month',
+    staffIncluded: '1 (Solo)',
+    features: ['1 Digital card', 'QR/NFC sharing', 'Admin dashboard access', 'Basic templates', 'VCF download'],
+    userLimit: 1,
+    isBusiness: false, // Typically individual plans are not "business" in terms of team features
+    description: "For solopreneurs, freelancers, and micro-businesses needing a professional digital presence.",
+  },
+  {
+    id: 'starter', // Internal ID, maps to "Business Starter"
+    name: 'Business Starter',
+    price: 'R249',
+    priceMonthly: 249,
+    currencySymbol: 'R',
+    frequency: '/ month',
+    staffIncluded: 'Up to 5 Staff',
+    features: ['All Starter features', 'Up to 5 unique cards', 'Team grouping', 'Company branding and logo', 'Basic analytics'],
+    extraStaffCost: 'R39',
+    extraStaffUnit: '/month each',
+    userLimit: 5,
+    isBusiness: true,
+    description: "Designed for small businesses and teams looking to manage multiple digital cards with core branding.",
+  },
+  {
+    id: 'growth',
+    name: 'Business Growth',
+    price: 'R499',
+    priceMonthly: 499,
+    currencySymbol: 'R',
+    frequency: '/ month',
+    staffIncluded: 'Up to 15 Staff',
+    features: ['All Business Starter features', 'AI Design Assistant', 'Advanced analytics (engagement, leads)', 'Priority email support'],
+    extraStaffCost: 'R35',
+    extraStaffUnit: '/month each',
+    userLimit: 15,
+    isBusiness: true,
+    popular: true,
+    description: "For growing SMEs or agencies requiring more cards, advanced features, and dedicated support.",
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 'Custom Quote',
+    priceMonthly: -1, // Indicates custom pricing
+    currencySymbol: '',
+    frequency: '',
+    staffIncluded: '20+ Staff',
+    features: ['Everything in Growth', 'Unlimited staff (volume pricing)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
+    userLimit: Infinity,
+    isBusiness: true,
+    description: "Tailored solutions for large organizations and corporates with specific needs and high volume usage.",
+  },
+];

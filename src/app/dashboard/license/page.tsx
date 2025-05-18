@@ -19,125 +19,66 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
 import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
+import { APP_PLANS, type AppPlan } from '@/lib/app-types'; // Import APP_PLANS and AppPlan
 import { useToast } from '@/hooks/use-toast';
 
-const allPlansData = [
-  {
-    id: 'free' as PlanId,
-    name: 'Personal Free',
-    price: '$0',
-    priceMonthly: 0,
-    currencySymbol: '$',
-    frequency: '/ month',
-    features: ['Up to 5 Cards', 'Basic Analytics', 'Standard Templates'],
-    userLimit: 1,
-    cardLimit: 5,
-    isBusiness: false,
-  },
-  {
-    id: 'starter' as PlanId,
-    name: 'Business Starter',
-    price: '$19',
-    priceMonthly: 19,
-    currencySymbol: '$',
-    frequency: '/ month',
-    features: ['Up to 50 Cards', 'Up to 5 Users', 'Advanced Analytics', 'Custom Templates', 'Team Management'],
-    userLimit: 5,
-    cardLimit: 50,
-    isBusiness: true,
-  },
-  {
-    id: 'growth' as PlanId,
-    name: 'Business Growth',
-    price: 'R115', 
-    priceMonthly: 115,
-    currencySymbol: 'R',
-    frequency: '/ month',
-    features: ['Up to 200 Cards', 'Up to 20 Users', 'All Starter Features', 'Priority Support', 'Batch Card Generation'],
-    userLimit: 20,
-    cardLimit: 200,
-    isBusiness: true,
-    popular: true,
-  },
-  {
-    id: 'enterprise' as PlanId,
-    name: 'Business Enterprise',
-    price: 'Contact Us',
-    priceMonthly: -1, 
-    currencySymbol: '',
-    frequency: '',
-    features: ['Unlimited Cards & Users', 'All Growth Features', 'Dedicated Account Manager', 'API Access', 'Custom Integrations'],
-    userLimit: Infinity,
-    cardLimit: Infinity,
-    isBusiness: true,
-  },
-];
-
-interface CurrentLicenseDetails {
+interface CurrentLicenseDisplayDetails {
   planName: string;
   status: "Active" | "Trial" | "Cancelled";
-  userLimit: number;
-  usersUsed: number; 
-  cardLimit: number;
-  cardsUsed: number; 
+  staffIncluded: string; // e.g. "Up to 5 Staff"
+  staffUsed: number; 
   renewsOn: string; 
-  pricePerMonth: number;
-  currencySymbol: string;
+  priceString: string; // e.g. "R249/month" or "Custom Quote"
+  userLimitForProgress: number; // Numeric limit for progress bar calculation
 }
 
-const DEFAULT_FALLBACK_LICENSE_DETAILS: CurrentLicenseDetails = {
+const DEFAULT_FALLBACK_LICENSE_DETAILS: CurrentLicenseDisplayDetails = {
     planName: "Business Growth", 
     status: "Active",
-    userLimit: 20,
-    usersUsed: 0, 
-    cardLimit: 200,
-    cardsUsed: 0, 
+    staffIncluded: "Up to 15 Staff",
+    staffUsed: 0, 
     renewsOn: "N/A", 
-    pricePerMonth: 115,
-    currencySymbol: "R",
+    priceString: "R499/month",
+    userLimitForProgress: 15,
 };
 
 
 export default function LicensePage() {
-  // useCurrentPlan now gets plan from Firestore via AuthContext
   const { currentPlan: activePlanIdFromAuth, setCurrentPlan: setActivePlanInFirestore, isLoading: isPlanLoading } = useCurrentPlan();
   const { toast } = useToast();
   const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
-  const [currentLicenseDetails, setCurrentLicenseDetails] = useState<CurrentLicenseDetails>(DEFAULT_FALLBACK_LICENSE_DETAILS);
+  const [currentLicenseDetails, setCurrentLicenseDetails] = useState<CurrentLicenseDisplayDetails>(DEFAULT_FALLBACK_LICENSE_DETAILS);
   const [selectedPlanInDialog, setSelectedPlanInDialog] = useState<PlanId | null>(null);
-
 
   useEffect(() => {
     if (!isPlanLoading && activePlanIdFromAuth) {
-      const planDetails = allPlansData.find(p => p.id === activePlanIdFromAuth);
+      const planDetails = APP_PLANS.find(p => p.id === activePlanIdFromAuth);
       if (planDetails) {
         setCurrentLicenseDetails({
           planName: planDetails.name,
-          status: "Active",
-          userLimit: planDetails.userLimit,
-          usersUsed: 0, // TODO: Fetch actual usage data
-          cardLimit: planDetails.cardLimit,
-          cardsUsed: 0, // TODO: Fetch actual usage data
-          renewsOn: "N/A", // TODO: Fetch actual renewal date
-          pricePerMonth: planDetails.priceMonthly,
-          currencySymbol: planDetails.currencySymbol,
+          status: "Active", // Assuming active if a plan is set
+          staffIncluded: planDetails.staffIncluded,
+          staffUsed: 0, // TODO: Fetch actual staff usage data
+          renewsOn: "N/A", // TODO: Fetch actual renewal date if applicable
+          priceString: planDetails.price === "Custom Quote" ? "Custom Quote" : `${planDetails.price}${planDetails.frequency}`,
+          userLimitForProgress: planDetails.userLimit,
         });
-        setSelectedPlanInDialog(activePlanIdFromAuth); // Keep dialog selection in sync
+        setSelectedPlanInDialog(activePlanIdFromAuth);
       } else {
-         // Fallback if plan ID from auth isn't in our known plans (should ideally not happen)
-         const defaultPlan = allPlansData.find(p => p.id === 'growth') || allPlansData[1]; // Starter or growth as fallback
+         const defaultPlan = APP_PLANS.find(p => p.id === 'growth') || APP_PLANS.find(p => p.isBusiness) || APP_PLANS[0];
          setCurrentLicenseDetails({
-            planName: defaultPlan.name, status: "Active", userLimit: defaultPlan.userLimit, usersUsed: 0,
-            cardLimit: defaultPlan.cardLimit, cardsUsed: 0, renewsOn: "N/A",
-            pricePerMonth: defaultPlan.priceMonthly, currencySymbol: defaultPlan.currencySymbol,
+            planName: defaultPlan.name, status: "Active", staffIncluded: defaultPlan.staffIncluded, staffUsed: 0,
+            renewsOn: "N/A", priceString: defaultPlan.price === "Custom Quote" ? "Custom Quote" : `${defaultPlan.price}${defaultPlan.frequency}`,
+            userLimitForProgress: defaultPlan.userLimit,
          });
          setSelectedPlanInDialog(defaultPlan.id);
       }
     }
   }, [activePlanIdFromAuth, isPlanLoading]);
 
-  const userUsagePercentage = currentLicenseDetails.userLimit > 0 && currentLicenseDetails.userLimit !== Infinity ? (currentLicenseDetails.usersUsed / currentLicenseDetails.userLimit) * 100 : 0;
-  const cardUsagePercentage = currentLicenseDetails.cardLimit > 0 && currentLicenseDetails.cardLimit !== Infinity ? (currentLicenseDetails.cardsUsed / currentLicenseDetails.cardLimit) * 100 : 0;
+  const staffUsagePercentage = currentLicenseDetails.userLimitForProgress > 0 && currentLicenseDetails.userLimitForProgress !== Infinity 
+    ? (currentLicenseDetails.staffUsed / currentLicenseDetails.userLimitForProgress) * 100 
+    : 0;
 
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
@@ -150,13 +91,12 @@ export default function LicensePage() {
   const handleConfirmPlanChangeInDialog = async () => {
     if (selectedPlanInDialog && selectedPlanInDialog !== activePlanIdFromAuth) {
       try {
-        await setActivePlanInFirestore(selectedPlanInDialog); // Update plan in Firestore
-        const planDetails = allPlansData.find(p => p.id === selectedPlanInDialog);
+        await setActivePlanInFirestore(selectedPlanInDialog);
+        const planDetails = APP_PLANS.find(p => p.id === selectedPlanInDialog);
         toast({
           title: "Plan Updated",
           description: `Your plan has been changed to ${planDetails?.name || 'the selected plan'}.`,
         });
-        // AuthContext will update activePlanIdFromAuth, triggering useEffect to update local details
       } catch (error) {
         console.error("Failed to update plan:", error);
         toast({
@@ -164,12 +104,9 @@ export default function LicensePage() {
             description: "Could not update your subscription plan. Please try again.",
             variant: "destructive",
         });
-      } finally {
-        setIsPlanDialogOpen(false);
       }
-    } else {
-      setIsPlanDialogOpen(false); // Close if no change or no selection
     }
+    setIsPlanDialogOpen(false);
   };
 
   if (isPlanLoading) {
@@ -204,9 +141,7 @@ export default function LicensePage() {
                 </div>
                 <div className="space-y-1 p-3 bg-secondary/30 rounded-md">
                   <p className="text-muted-foreground">Price:</p>
-                  <p className="font-semibold">
-                    {currentLicenseDetails.pricePerMonth === -1 ? 'Custom' : `${currentLicenseDetails.currencySymbol}${currentLicenseDetails.pricePerMonth}/month`}
-                  </p>
+                  <p className="font-semibold">{currentLicenseDetails.priceString}</p>
                 </div>
                 <div className="space-y-1 p-3 bg-secondary/30 rounded-md">
                   <p className="text-muted-foreground">Renews On:</p>
@@ -217,35 +152,19 @@ export default function LicensePage() {
               <Separator className="my-4" />
 
               <div>
-                <h4 className="font-medium mb-2 text-md flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />User Quota</h4>
+                <h4 className="font-medium mb-2 text-md flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />Staff Quota ({currentLicenseDetails.staffIncluded})</h4>
                  <div className="flex items-center justify-between mb-1">
                    <span className="text-sm text-muted-foreground">
-                     {currentLicenseDetails.usersUsed} of {currentLicenseDetails.userLimit === Infinity ? 'Unlimited' : currentLicenseDetails.userLimit} users
+                     {currentLicenseDetails.staffUsed} of {currentLicenseDetails.userLimitForProgress === Infinity ? 'Unlimited' : currentLicenseDetails.userLimitForProgress} staff members
                    </span>
-                   {currentLicenseDetails.userLimit !== Infinity && <span className="text-sm font-semibold text-primary">{userUsagePercentage.toFixed(0)}%</span>}
+                   {currentLicenseDetails.userLimitForProgress !== Infinity && <span className="text-sm font-semibold text-primary">{staffUsagePercentage.toFixed(0)}%</span>}
                  </div>
-                {currentLicenseDetails.userLimit !== Infinity && (
+                {currentLicenseDetails.userLimitForProgress !== Infinity && (
                     <div className="w-full bg-muted rounded-full h-2.5">
-                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${userUsagePercentage}%` }}></div>
+                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${staffUsagePercentage}%` }}></div>
                     </div>
                 )}
               </div>
-
-              <div>
-                <h4 className="font-medium mb-2 text-md flex items-center"><CreditCard className="mr-2 h-5 w-5 text-primary" />Card Quota</h4>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-muted-foreground">
-                    {currentLicenseDetails.cardsUsed} of {currentLicenseDetails.cardLimit === Infinity ? 'Unlimited' : currentLicenseDetails.cardLimit} cards
-                  </span>
-                  {currentLicenseDetails.cardLimit !== Infinity && <span className="text-sm font-semibold text-primary">{cardUsagePercentage.toFixed(0)}%</span>}
-                </div>
-                {currentLicenseDetails.cardLimit !== Infinity && (
-                    <div className="w-full bg-muted rounded-full h-2.5">
-                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${cardUsagePercentage}%` }}></div>
-                    </div>
-                )}
-              </div>
-
             </CardContent>
             <CardFooter className="border-t pt-4">
                <Button onClick={() => { setSelectedPlanInDialog(activePlanIdFromAuth); setIsPlanDialogOpen(true); }} variant="outline" className="w-full md:w-auto">
@@ -283,7 +202,7 @@ export default function LicensePage() {
           </DialogHeader>
           <ScrollArea className="flex-grow py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-1">
-              {allPlansData.map((plan) => (
+              {APP_PLANS.map((plan) => (
                 <Card 
                   key={plan.id} 
                   className={cn(
@@ -300,24 +219,31 @@ export default function LicensePage() {
                   )}
                   <CardHeader className="text-center">
                     <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                    <CardDescription className="text-muted-foreground">
+                    <CardDescription className="text-muted-foreground mt-1">
                       <span className="text-4xl font-bold text-foreground">{plan.price}</span>
                       <span className="text-sm">{plan.frequency}</span>
                     </CardDescription>
+                     {plan.description && (
+                        <p className="text-xs text-muted-foreground mt-2 min-h-[40px]">{plan.description}</p>
+                     )}
                   </CardHeader>
-                  <CardContent className="flex-grow space-y-3">
+                  <CardContent className="flex-grow space-y-3 pt-0">
+                    <p className="text-sm font-medium text-center text-primary py-2 border-y">
+                      {plan.staffIncluded}
+                    </p>
                     <ul className="space-y-2 text-sm">
                       {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-center">
-                          <CheckCircle className="h-4 w-4 mr-2 text-green-500 flex-shrink-0" />
-                          {feature}
+                        <li key={index} className="flex items-start">
+                          <CheckCircle className="h-4 w-4 mr-2 mt-0.5 text-green-500 flex-shrink-0" />
+                          <span>{feature}</span>
                         </li>
                       ))}
                     </ul>
-                    <p className="text-xs text-muted-foreground mt-4">
-                      {plan.isBusiness ? <Users className="inline h-3 w-3 mr-1"/> : null }
-                      {plan.userLimit === Infinity ? 'Unlimited Users' : `Up to ${plan.userLimit} User${plan.userLimit > 1 ? 's' : ''}`}
-                    </p>
+                    {plan.extraStaffCost && plan.extraStaffUnit && (
+                      <p className="text-xs text-muted-foreground pt-2">
+                        Extra Staff: {plan.extraStaffCost}{plan.extraStaffUnit}
+                      </p>
+                    )}
                   </CardContent>
                    <CardFooter>
                      <Button 
@@ -338,7 +264,7 @@ export default function LicensePage() {
           </ScrollArea>
           <DialogFooter className="border-t pt-4 flex-col sm:flex-row sm:justify-between items-center">
              <p className="text-xs text-muted-foreground mb-2 sm:mb-0">
-                Selected: {allPlansData.find(p => p.id === selectedPlanInDialog)?.name || 'None'}
+                Selected: {APP_PLANS.find(p => p.id === selectedPlanInDialog)?.name || 'None'}
              </p>
             <div>
                 <DialogClose asChild>
