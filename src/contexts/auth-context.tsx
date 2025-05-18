@@ -1,16 +1,18 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import type { AdminUser } from '@/lib/app-types'; // Using AdminUser for more specific typing
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import type { AdminUser, CompanyProfile, PlanId } from '@/lib/app-types';
 
 interface AuthContextType {
   currentUser: (FirebaseUser & { companyId?: string; adminProfile?: AdminUser }) | null;
   loading: boolean;
-  companyId: string | null; // Explicitly add companyId here
+  companyId: string | null;
+  activePlanId: PlanId | null;
+  updateCompanyPlan: (planId: PlanId) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,34 +21,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<(FirebaseUser & { companyId?: string; adminProfile?: AdminUser }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<PlanId | null>(null);
+
+  const updateCompanyPlan = useCallback(async (planId: PlanId) => {
+    if (companyId) {
+      try {
+        const companyRef = doc(db, "companies", companyId);
+        await updateDoc(companyRef, { activePlanId: planId });
+        setActivePlanId(planId); // Update local context state
+      } catch (error) {
+        console.error("Error updating company plan in Firestore:", error);
+        // Optionally, throw the error or handle it with a toast
+        throw error;
+      }
+    } else {
+      console.error("Cannot update plan: companyId not available.");
+      throw new Error("Company ID not available to update plan.");
+    }
+  }, [companyId]);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // In our simplified model, the user's UID is their adminId AND companyId.
-        // Fetch admin profile to get companyId if it were stored differently
-        // For now, we'll assume user.uid is the companyId.
-        const adminUserRef = doc(db, `companies/${user.uid}/admins/${user.uid}`);
-        const adminDocSnap = await getDoc(adminUserRef);
+        const currentCompanyId = user.uid; // Assuming admin UID is company ID
+        setCompanyId(currentCompanyId);
+        
         let fetchedAdminProfile: AdminUser | undefined;
-        let fetchedCompanyId: string | undefined = user.uid; // Default to user.uid as companyId
+        let fetchedPlanId: PlanId | null = null;
 
-        if (adminDocSnap.exists()) {
-          fetchedAdminProfile = adminDocSnap.data() as AdminUser;
-          if (fetchedAdminProfile.companyId) {
-             fetchedCompanyId = fetchedAdminProfile.companyId;
+        try {
+          // Fetch Admin Profile
+          const adminUserRef = doc(db, `companies/${currentCompanyId}/admins/${user.uid}`);
+          const adminDocSnap = await getDoc(adminUserRef);
+          if (adminDocSnap.exists()) {
+            fetchedAdminProfile = adminDocSnap.data() as AdminUser;
+          } else {
+            console.warn(`Admin profile not found for UID: ${user.uid}.`);
           }
-        } else {
-          // This case might happen if signup didn't complete or user doc was deleted.
-          // For now, we stick with user.uid as companyId if adminProfile is not found.
-          console.warn(`Admin profile not found for UID: ${user.uid}. Using UID as companyId.`);
+
+          // Fetch Company Profile (which includes activePlanId)
+          const companyRef = doc(db, "companies", currentCompanyId);
+          const companyDocSnap = await getDoc(companyRef);
+          if (companyDocSnap.exists()) {
+            const companyData = companyDocSnap.data() as CompanyProfile;
+            fetchedPlanId = companyData.activePlanId || null;
+          } else {
+            console.warn(`Company profile not found for ID: ${currentCompanyId}.`);
+          }
+        } catch (error) {
+            console.error("Error fetching user/company data during auth state change:", error);
         }
         
-        setCurrentUser({ ...user, companyId: fetchedCompanyId, adminProfile: fetchedAdminProfile });
-        setCompanyId(fetchedCompanyId);
+        setCurrentUser({ ...user, companyId: currentCompanyId, adminProfile: fetchedAdminProfile });
+        setActivePlanId(fetchedPlanId);
+
       } else {
         setCurrentUser(null);
         setCompanyId(null);
+        setActivePlanId(null);
       }
       setLoading(false);
     });
@@ -55,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ currentUser, loading, companyId }}>
+    <AuthContext.Provider value={{ currentUser, loading, companyId, activePlanId, updateCompanyPlan }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,7 +1,8 @@
 
-// Renaming types.ts to app-types.ts to avoid conflict with native TS types
-// And to specifically denote application-level type definitions.
+// src/lib/app-types.ts
 import type { Timestamp } from 'firebase/firestore';
+
+export type PlanId = 'free' | 'starter' | 'growth' | 'enterprise';
 
 // Data displayed ON a staff member's card
 export interface StaffCardData {
@@ -40,6 +41,7 @@ export interface CompanyProfile {
   size?: string;
   website?: string;
   address?: string;
+  activePlanId: PlanId; // Added to store the current plan
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
@@ -58,7 +60,7 @@ export interface AdminUser {
   role: AdminRole;
   status: UserStatus;
   profilePictureUrl?: string;
-  lastLoginAt?: Timestamp | string;
+  lastLoginAt?: Timestamp | string | null; // Allow null
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
@@ -74,44 +76,22 @@ export interface StaffRecord {
   status: UserStatus;
   fingerprintUrl: string; // Unique, admin-settable URL slug for the public card
   uniqueNfcIdentifier?: string; // For NFC card hardware
-  // Card specific data and design is now part of StaffRecord
   cardDisplayData: StaffCardData;
   designSettings: CardDesignSettings;
-  // --
-  cardsCreatedCount?: number; // This might be deprecated if one staff = one card
-  lastLoginAt?: Timestamp | string; // Likely not relevant for staff not logging in
+  cardsCreatedCount?: number;
+  lastLoginAt?: Timestamp | string | null; // Allow null
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
-}
-
-
-// Represents a Digital Business Card record in Firebase - THIS MIGHT BE MERGED/REPLACED
-// If each StaffRecord essentially IS a card, this separate entity might not be needed
-// unless you want multiple card versions per staff, or cards unlinked to staff.
-// For now, assuming StaffRecord holds the card data directly.
-export interface DigitalBusinessCardRecord {
-  id: string; // cardId
-  staffRecordId: string; // Link to the StaffRecord
-  // companyId is implicit via staffRecord
-  // templateId?: string; // Could reference a CardTemplateRecord
-  // customFields?: Record<string, any>; // No longer needed if all in StaffCardData
-  // cardData: StaffCardData; // Now part of StaffRecord
-  // designSettings: CardDesignSettings; // Now part of StaffRecord
-  isActive: boolean;
-  nfcTagId?: string; // Link to a physical NFC tag
-  createdAt: Timestamp | string;
-  updatedAt: Timestamp | string;
 }
 
 // Represents a Card Template record in Firebase
 export interface CardTemplateRecord {
   id: string; // templateId
-  // companyId is implicit
   name: string;
   description?: string;
-  designSettings: CardDesignSettings; // The design settings of the template
-  defaultCardDisplayData: Partial<StaffCardData>; // Default profile fields for this template
-  isDefaultCompanyTemplate?: boolean; // Is this the default for new staff in the company?
+  designSettings: CardDesignSettings;
+  defaultCardDisplayData: Partial<StaffCardData>;
+  isDefaultCompanyTemplate?: boolean;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
@@ -124,9 +104,6 @@ export interface AccessCode {
     expiresAt?: Timestamp | string;
     createdAt: Timestamp | string;
 }
-
-// AppTemplate is no longer used for initializing the editor with multiple options
-// It's removed to avoid mock data dependency.
 
 export const defaultStaffCardData: StaffCardData = {
   name: '',
@@ -153,24 +130,43 @@ export const defaultCardDesignSettings: CardDesignSettings = {
     textColor: '#333333',
     primaryColor: '#3F51B5',
   },
-  qrCodeUrl: '', // Will be generated based on staff's fingerprintUrl
+  qrCodeUrl: '',
 };
 
-// For Dashboard Teams list
 export interface Team {
   id: string;
   name: string;
   description: string;
-  memberUserIds?: string[];
-  managerId?: string; // ID of the manager (StaffRecord ID)
-  managerName?: string; // Name of the manager (denormalized for display)
+  managerId?: string;
+  managerName?: string;
   memberCount: number;
+  memberUserIds?: string[]; // Added to store member IDs directly on the team
+  assignedTemplates?: AssignedTemplate[]; // Placeholder for future template assignment
+  teamMetrics?: TeamMetrics; // Placeholder for team-specific aggregated metrics
   defaultTemplateId?: string;
   createdAt?: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
 
-// For Contact Collection on Public Card
+export interface AssignedTemplate {
+  id: string;
+  name: string;
+}
+
+export interface TeamMetrics {
+  cardsCreated: number;
+  averageSharesPerCard: number;
+  leadsGenerated: number;
+  activeMembers: number;
+}
+
+export interface OrganizationUser { // For selecting managers or adding to teams
+  id: string;
+  name: string;
+  email: string;
+  role?: StaffRole | AdminRole; // Can be either
+}
+
 export interface ContactInfo {
   id: string;
   name: string;
@@ -178,7 +174,6 @@ export interface ContactInfo {
   phone?: string;
   company?: string;
   message?: string;
-  submittedFromCardId?: string; // fingerprintUrl of the card it was submitted from
-  submittedAt: Timestamp | string; // ISO string or Firestore Timestamp
+  submittedFromCardId?: string;
+  submittedAt: Timestamp | string;
 }
-    

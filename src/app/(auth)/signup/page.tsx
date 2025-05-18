@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label";
 import Link from 'next/link';
 import { UserPlus, Mail, Key, Building, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { auth, db } from '@/lib/firebase'; // Import Firebase auth and db
+import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import type { CompanyProfile, AdminUser } from '@/lib/app-types';
+import type { CompanyProfile, AdminUser, PlanId } from '@/lib/app-types';
+
+const DEFAULT_INITIAL_PLAN: PlanId = 'growth'; // Or 'free' if you prefer that as initial
 
 export default function SignupPage() {
   const router = useRouter();
@@ -58,18 +60,17 @@ export default function SignupPage() {
       const user = userCredential.user;
 
       // Create Company Profile in Firestore
-      // Using user.uid as companyId for simplicity in this admin-first model
-      const companyRef = doc(db, "companies", user.uid);
+      const companyRef = doc(db, "companies", user.uid); // Using user.uid as companyId
       const companyProfile: CompanyProfile = {
         id: user.uid,
         name: companyName,
+        activePlanId: DEFAULT_INITIAL_PLAN, // Set default plan
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
       await setDoc(companyRef, companyProfile);
 
-      // Create Admin User Profile in Firestore (subcollection of company)
-      // Using user.uid as adminId
+      // Create Admin User Profile in Firestore
       const adminRef = doc(db, `companies/${companyProfile.id}/admins`, user.uid);
       const adminProfile: AdminUser = {
         id: user.uid,
@@ -78,7 +79,7 @@ export default function SignupPage() {
         email: user.email || '',
         emailVerified: user.emailVerified,
         role: 'Owner',
-        status: 'Active', // First admin is active
+        status: 'Active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -86,10 +87,11 @@ export default function SignupPage() {
 
       toast({
         title: "Company Account Created!",
-        description: `Welcome, ${adminName}! Redirecting to your Business Dashboard...`,
+        description: `Welcome, ${adminName}! Please select your subscription plan.`,
         variant: "default",
       });
-      router.push('/dashboard');
+      // Redirect to subscription page after signup
+      router.push('/subscription');
     } catch (error: any) {
       console.error("Error during admin & company signup:", error);
       if (error.code === 'auth/email-already-in-use') {

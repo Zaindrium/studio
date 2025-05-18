@@ -2,41 +2,32 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import type { PlanId } from '@/lib/app-types';
 
-export type PlanId = 'free' | 'starter' | 'growth' | 'enterprise';
-const LOCAL_STORAGE_KEY = 'linkup_current_plan_id';
-const DEFAULT_PLAN_ID: PlanId = 'growth'; // Default plan if nothing is set
+const DEFAULT_FALLBACK_PLAN_ID: PlanId = 'growth';
 
 export function useCurrentPlan() {
+  const { activePlanId: planFromAuth, updateCompanyPlan, loading: authLoading } = useAuth();
   const [currentPlan, setCurrentPlanState] = useState<PlanId | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const storedPlan = localStorage.getItem(LOCAL_STORAGE_KEY) as PlanId | null;
-      if (storedPlan && ['free', 'starter', 'growth', 'enterprise'].includes(storedPlan)) {
-        setCurrentPlanState(storedPlan);
-      } else {
-        setCurrentPlanState(DEFAULT_PLAN_ID);
-        // Optionally set the default in localStorage if it wasn't there
-        // localStorage.setItem(LOCAL_STORAGE_KEY, DEFAULT_PLAN_ID);
-      }
-    } catch (error) {
-      console.error("Error accessing localStorage for current plan:", error);
-      setCurrentPlanState(DEFAULT_PLAN_ID); // Fallback to default on error
-    } finally {
+    if (!authLoading) {
+      setCurrentPlanState(planFromAuth || DEFAULT_FALLBACK_PLAN_ID);
       setIsLoading(false);
     }
-  }, []);
+  }, [authLoading, planFromAuth]);
 
-  const setCurrentPlan = useCallback((planId: PlanId) => {
+  const setCurrentPlan = useCallback(async (planId: PlanId) => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, planId);
-      setCurrentPlanState(planId);
+      await updateCompanyPlan(planId);
+      setCurrentPlanState(planId); // Local state updates on successful Firestore update (handled in AuthContext)
     } catch (error) {
-      console.error("Error setting current plan in localStorage:", error);
+      console.error("Error setting current plan (via useCurrentPlan -> updateCompanyPlan):", error);
+      // Optionally, surface this error to the user via toast
     }
-  }, []);
+  }, [updateCompanyPlan]);
 
   return { currentPlan, setCurrentPlan, isLoading };
 }

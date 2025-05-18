@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
 import { useToast } from '@/hooks/use-toast';
 
-// Define plan details - this could be moved to a shared file
 const allPlansData = [
   {
     id: 'free' as PlanId,
@@ -50,7 +49,7 @@ const allPlansData = [
   {
     id: 'growth' as PlanId,
     name: 'Business Growth',
-    price: 'R115', // Updated for consistency with previous requests
+    price: 'R115', 
     priceMonthly: 115,
     currencySymbol: 'R',
     frequency: '/ month',
@@ -64,7 +63,7 @@ const allPlansData = [
     id: 'enterprise' as PlanId,
     name: 'Business Enterprise',
     price: 'Contact Us',
-    priceMonthly: -1, // Indicates custom pricing
+    priceMonthly: -1, 
     currencySymbol: '',
     frequency: '',
     features: ['Unlimited Cards & Users', 'All Growth Features', 'Dedicated Account Manager', 'API Access', 'Custom Integrations'],
@@ -78,69 +77,64 @@ interface CurrentLicenseDetails {
   planName: string;
   status: "Active" | "Trial" | "Cancelled";
   userLimit: number;
-  usersUsed: number; // Mocked for now
+  usersUsed: number; 
   cardLimit: number;
-  cardsUsed: number; // Mocked for now
-  renewsOn: string; // Mocked
+  cardsUsed: number; 
+  renewsOn: string; 
   pricePerMonth: number;
   currencySymbol: string;
 }
 
-const DEFAULT_LICENSE_DETAILS: CurrentLicenseDetails = {
-    planName: "Business Growth", // Fallback
+const DEFAULT_FALLBACK_LICENSE_DETAILS: CurrentLicenseDetails = {
+    planName: "Business Growth", 
     status: "Active",
     userLimit: 20,
-    usersUsed: 15, // example
+    usersUsed: 0, 
     cardLimit: 200,
-    cardsUsed: 78, // example
-    renewsOn: "August 30, 2024", // example
+    cardsUsed: 0, 
+    renewsOn: "N/A", 
     pricePerMonth: 115,
     currencySymbol: "R",
 };
 
 
 export default function LicensePage() {
-  const { currentPlan: activePlanId, setCurrentPlan: setActivePlanInStorage, isLoading: isPlanLoading } = useCurrentPlan();
+  // useCurrentPlan now gets plan from Firestore via AuthContext
+  const { currentPlan: activePlanIdFromAuth, setCurrentPlan: setActivePlanInFirestore, isLoading: isPlanLoading } = useCurrentPlan();
   const { toast } = useToast();
   const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
-  const [currentLicenseDetails, setCurrentLicenseDetails] = useState<CurrentLicenseDetails>(DEFAULT_LICENSE_DETAILS);
-  const [selectedPlanInDialog, setSelectedPlanInDialog] = useState<PlanId | null>(activePlanId);
+  const [currentLicenseDetails, setCurrentLicenseDetails] = useState<CurrentLicenseDetails>(DEFAULT_FALLBACK_LICENSE_DETAILS);
+  const [selectedPlanInDialog, setSelectedPlanInDialog] = useState<PlanId | null>(null);
 
 
   useEffect(() => {
-    if (!isPlanLoading && activePlanId) {
-      const planDetails = allPlansData.find(p => p.id === activePlanId);
+    if (!isPlanLoading && activePlanIdFromAuth) {
+      const planDetails = allPlansData.find(p => p.id === activePlanIdFromAuth);
       if (planDetails) {
         setCurrentLicenseDetails({
           planName: planDetails.name,
-          status: "Active", // Assuming active for simplicity
+          status: "Active",
           userLimit: planDetails.userLimit,
-          usersUsed: DEFAULT_LICENSE_DETAILS.usersUsed, // Keep mock usage for now
+          usersUsed: 0, // TODO: Fetch actual usage data
           cardLimit: planDetails.cardLimit,
-          cardsUsed: DEFAULT_LICENSE_DETAILS.cardsUsed, // Keep mock usage
-          renewsOn: DEFAULT_LICENSE_DETAILS.renewsOn, // Keep mock renewal
+          cardsUsed: 0, // TODO: Fetch actual usage data
+          renewsOn: "N/A", // TODO: Fetch actual renewal date
           pricePerMonth: planDetails.priceMonthly,
           currencySymbol: planDetails.currencySymbol,
         });
-        setSelectedPlanInDialog(activePlanId);
+        setSelectedPlanInDialog(activePlanIdFromAuth); // Keep dialog selection in sync
       } else {
-         // Fallback if plan ID from storage isn't in our data (e.g. corrupted storage)
-         const defaultPlan = allPlansData.find(p => p.id === 'growth') || allPlansData[0];
+         // Fallback if plan ID from auth isn't in our known plans (should ideally not happen)
+         const defaultPlan = allPlansData.find(p => p.id === 'growth') || allPlansData[1]; // Starter or growth as fallback
          setCurrentLicenseDetails({
-            planName: defaultPlan.name,
-            status: "Active",
-            userLimit: defaultPlan.userLimit,
-            usersUsed: DEFAULT_LICENSE_DETAILS.usersUsed,
-            cardLimit: defaultPlan.cardLimit,
-            cardsUsed: DEFAULT_LICENSE_DETAILS.cardsUsed,
-            renewsOn: DEFAULT_LICENSE_DETAILS.renewsOn,
-            pricePerMonth: defaultPlan.priceMonthly,
-            currencySymbol: defaultPlan.currencySymbol,
+            planName: defaultPlan.name, status: "Active", userLimit: defaultPlan.userLimit, usersUsed: 0,
+            cardLimit: defaultPlan.cardLimit, cardsUsed: 0, renewsOn: "N/A",
+            pricePerMonth: defaultPlan.priceMonthly, currencySymbol: defaultPlan.currencySymbol,
          });
          setSelectedPlanInDialog(defaultPlan.id);
       }
     }
-  }, [activePlanId, isPlanLoading]);
+  }, [activePlanIdFromAuth, isPlanLoading]);
 
   const userUsagePercentage = currentLicenseDetails.userLimit > 0 && currentLicenseDetails.userLimit !== Infinity ? (currentLicenseDetails.usersUsed / currentLicenseDetails.userLimit) * 100 : 0;
   const cardUsagePercentage = currentLicenseDetails.cardLimit > 0 && currentLicenseDetails.cardLimit !== Infinity ? (currentLicenseDetails.cardsUsed / currentLicenseDetails.cardLimit) * 100 : 0;
@@ -153,15 +147,28 @@ export default function LicensePage() {
     }
   };
   
-  const handleConfirmPlanChangeInDialog = () => {
-    if (selectedPlanInDialog) {
-      setActivePlanInStorage(selectedPlanInDialog);
-      const planDetails = allPlansData.find(p => p.id === selectedPlanInDialog);
-      toast({
-        title: "Plan Updated (Simulated)",
-        description: `Your plan has been changed to ${planDetails?.name || 'the selected plan'}.`,
-      });
-      setIsPlanDialogOpen(false);
+  const handleConfirmPlanChangeInDialog = async () => {
+    if (selectedPlanInDialog && selectedPlanInDialog !== activePlanIdFromAuth) {
+      try {
+        await setActivePlanInFirestore(selectedPlanInDialog); // Update plan in Firestore
+        const planDetails = allPlansData.find(p => p.id === selectedPlanInDialog);
+        toast({
+          title: "Plan Updated",
+          description: `Your plan has been changed to ${planDetails?.name || 'the selected plan'}.`,
+        });
+        // AuthContext will update activePlanIdFromAuth, triggering useEffect to update local details
+      } catch (error) {
+        console.error("Failed to update plan:", error);
+        toast({
+            title: "Update Failed",
+            description: "Could not update your subscription plan. Please try again.",
+            variant: "destructive",
+        });
+      } finally {
+        setIsPlanDialogOpen(false);
+      }
+    } else {
+      setIsPlanDialogOpen(false); // Close if no change or no selection
     }
   };
 
@@ -241,7 +248,7 @@ export default function LicensePage() {
 
             </CardContent>
             <CardFooter className="border-t pt-4">
-               <Button onClick={() => { setSelectedPlanInDialog(activePlanId); setIsPlanDialogOpen(true); }} variant="outline" className="w-full md:w-auto">
+               <Button onClick={() => { setSelectedPlanInDialog(activePlanIdFromAuth); setIsPlanDialogOpen(true); }} variant="outline" className="w-full md:w-auto">
                   <Repeat className="mr-2 h-4 w-4" /> Change Plan or View Options
                 </Button>
             </CardFooter>
@@ -318,7 +325,7 @@ export default function LicensePage() {
                         variant={selectedPlanInDialog === plan.id ? "default" : "outline"}
                         disabled={plan.price === 'Contact Us'}
                         onClick={(e) => {
-                            e.stopPropagation(); // Prevent card onClick from firing
+                            e.stopPropagation(); 
                             if(plan.price !== 'Contact Us') setSelectedPlanInDialog(plan.id);
                         }}
                       >
@@ -340,7 +347,7 @@ export default function LicensePage() {
                 <Button 
                     type="button" 
                     onClick={handleConfirmPlanChangeInDialog}
-                    disabled={!selectedPlanInDialog || selectedPlanInDialog === activePlanId}
+                    disabled={!selectedPlanInDialog || selectedPlanInDialog === activePlanIdFromAuth}
                 >
                     Confirm Change
                 </Button>
@@ -348,7 +355,6 @@ export default function LicensePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </div>
   );
 }

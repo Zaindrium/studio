@@ -1,14 +1,14 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { CheckCircle, Star, Users, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan'; // Import hook and PlanId
-import { useToast } from '@/hooks/use-toast'; // Import useToast
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useCurrentPlan, type PlanId } from '@/hooks/use-current-plan';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const plans = [
   {
@@ -32,7 +32,7 @@ const plans = [
   {
     id: 'growth' as PlanId,
     name: 'Business Growth',
-    price: '$49',
+    price: 'R115',
     frequency: '/ month',
     features: ['Up to 200 Cards', 'Up to 20 Users', 'All Starter Features', 'Priority Support', 'Batch Card Generation'],
     userLimit: 20,
@@ -51,21 +51,22 @@ const plans = [
 ];
 
 export default function SubscriptionPage() {
-  const { currentPlan: activePlanId, setCurrentPlan, isLoading: isPlanLoading } = useCurrentPlan();
+  // useCurrentPlan now gets plan from Firestore via AuthContext
+  const { currentPlan: activePlanIdFromAuth, setCurrentPlan: setActivePlanInFirestore, isLoading: isPlanLoading } = useCurrentPlan();
   const { toast } = useToast();
   const router = useRouter();
   
-  // Use activePlanId from the hook for initial selection if not loading, otherwise fallback or default.
   const [selectedPlanId, setSelectedPlanId] = useState<PlanId | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  React.useEffect(() => {
-    if (!isPlanLoading && activePlanId) {
-      setSelectedPlanId(activePlanId);
-    } else if (!isPlanLoading && !activePlanId) {
-        setSelectedPlanId(plans[1].id); // Default to starter if no plan set
+  useEffect(() => {
+    if (!isPlanLoading && activePlanIdFromAuth) {
+      setSelectedPlanId(activePlanIdFromAuth);
+    } else if (!isPlanLoading && !activePlanIdFromAuth) {
+        // If no plan is set in AuthContext (e.g., new user before Firestore write), default selection
+        setSelectedPlanId(plans.find(p => p.id === 'growth')?.id || plans[1].id); 
     }
-  }, [activePlanId, isPlanLoading]);
+  }, [activePlanIdFromAuth, isPlanLoading]);
 
 
   const handleProceedToPayment = async () => {
@@ -74,19 +75,23 @@ export default function SubscriptionPage() {
     
     const selectedPlanDetails = plans.find(p => p.id === selectedPlanId);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-
-    setCurrentPlan(selectedPlanId); // Update plan in localStorage via hook
-
-    toast({
-      title: `Plan Selected: ${selectedPlanDetails?.name || 'Selected Plan'}`,
-      description: selectedPlanId === 'free' ? "You're now on the Free plan!" : "Your subscription has been updated. Redirecting...",
-    });
-
-    setIsProcessing(false);
-    // Redirect to dashboard after plan selection
-    router.push('/dashboard'); 
+    try {
+      await setActivePlanInFirestore(selectedPlanId); // Update plan in Firestore via hook
+      toast({
+        title: `Plan Selected: ${selectedPlanDetails?.name || 'Selected Plan'}`,
+        description: selectedPlanId === 'free' ? "You're now on the Free plan!" : "Your subscription has been updated. Redirecting...",
+      });
+      router.push('/dashboard'); 
+    } catch (error) {
+        console.error("Failed to update plan:", error);
+        toast({
+            title: "Update Failed",
+            description: "Could not update your subscription plan. Please try again.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsProcessing(false);
+    }
   };
 
   if (isPlanLoading) {
@@ -131,7 +136,7 @@ export default function SubscriptionPage() {
                   </li>
                 ))}
               </ul>
-               <p className="text-xs text-muted-foreground mt-4"> {/* Increased mt-2 to mt-4 */}
+               <p className="text-xs text-muted-foreground mt-4">
                 {plan.isBusiness ? <Users className="inline h-3 w-3 mr-1"/> : null }
                 {plan.userLimit === Infinity ? 'Unlimited Users' : `Up to ${plan.userLimit} User${plan.userLimit > 1 ? 's' : ''}`}
               </p>
