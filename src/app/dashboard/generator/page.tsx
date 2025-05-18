@@ -6,11 +6,13 @@ import dynamic from 'next/dynamic';
 import { UserProfileForm } from '@/components/UserProfileForm';
 import { CardPreview } from '@/components/CardPreview';
 import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
-import { defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types';
+import { defaultStaffCardData, defaultCardDesignSettings, APP_TEMPLATES } from '@/lib/app-types'; // Import APP_TEMPLATES
 import { sanitizeForUrl } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Blocks } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+// TemplatePicker is not being used for now, so import can be removed if not re-added
+// import { TemplatePicker } from '@/components/TemplatePicker'; 
 
 const CardDesigner = dynamic(() => import('@/components/CardDesigner').then(mod => mod.CardDesigner), {
   loading: () => <Skeleton className="h-[400px] w-full rounded-lg" />,
@@ -23,28 +25,24 @@ const ShareCard = dynamic(() => import('@/components/ShareCard').then(mod => mod
 });
 
 export default function GeneratorPage() {
-  // Initialize with minimal default data, not template-specific data
-  const [staffCardProfile, setStaffCardProfile] = useState<StaffCardData>(defaultStaffCardData);
-  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(defaultCardDesignSettings);
+  // Initialize with the first template from APP_TEMPLATES or defaults if empty
+  const initialTemplate = APP_TEMPLATES.length > 0 ? APP_TEMPLATES[0] : { profile: defaultStaffCardData, design: defaultCardDesignSettings };
+
+  const [staffCardProfile, setStaffCardProfile] = useState<StaffCardData>(initialTemplate.profile);
+  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(initialTemplate.design);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    // Initialize with default data. In a real app, you'd fetch data for a specific staff member
-    // if an ID is provided (e.g., via query param or context if editing a specific card).
-    // For now, it starts with the blank defaults.
-    setStaffCardProfile(defaultStaffCardData);
-    setCardDesign(defaultCardDesignSettings);
-  }, []);
+    // Set initial state from the chosen template
+    setStaffCardProfile(initialTemplate.profile);
+    setCardDesign(initialTemplate.design);
+  }, [initialTemplate.profile, initialTemplate.design]); // Depend on initialTemplate fields
 
   useEffect(() => {
-    if (isClient && staffCardProfile.name) { // Only generate QR if name exists
+    if (isClient && staffCardProfile.name) {
       const cardIdentifier = sanitizeForUrl(staffCardProfile.name);
-      // For the generator, the QR code might point to a generic preview or be less critical
-      // than on a live staff card. Let's use a placeholder or a non-specific URL for now.
-      // Or, if admins create a "fingerprint" URL here, it would be used.
-      // For simplicity, we'll use a sanitized name.
-      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}-preview`; // Example
+      const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}-preview`;
       setCardDesign(prev => {
         if (prev.qrCodeUrl !== newQrCodeUrl) {
           return { ...prev, qrCodeUrl: newQrCodeUrl };
@@ -52,7 +50,6 @@ export default function GeneratorPage() {
         return prev;
       });
     } else if (isClient && !staffCardProfile.name) {
-        // If name is cleared, clear the QR code URL or set to a default
         setCardDesign(prev => ({ ...prev, qrCodeUrl: '' }));
     }
   }, [staffCardProfile.name, isClient]);
@@ -148,9 +145,24 @@ export default function GeneratorPage() {
         <Card className="mb-6 shadow-none border-0 rounded-none">
           <CardHeader className="pb-2 pt-0 px-0">
               <CardTitle className="flex items-center text-xl"><Blocks className="mr-2 h-5 w-5 text-primary"/>Digital Card Editor</CardTitle>
-              <CardDescription>Design and customize a digital business card. This data will be used when adding new staff.</CardDescription>
+              <CardDescription>Design and customize a digital business card. This data will be used when adding new staff or creating templates.</CardDescription>
           </CardHeader>
         </Card>
+
+        {/* 
+          Future: If a template picker is desired again, it could be re-added here:
+          <TemplatePicker 
+            templates={APP_TEMPLATES} 
+            currentTemplateId={cardDesign.template} 
+            onTemplateSelect={(templateId) => {
+              const selected = APP_TEMPLATES.find(t => t.id === templateId);
+              if (selected) {
+                setStaffCardProfile(selected.profile);
+                setCardDesign(selected.design);
+              }
+            }} 
+          /> 
+        */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">

@@ -9,7 +9,7 @@ export interface StaffCardData {
   name: string;
   title: string;
   companyName?: string; // Company name on the card
-  companyLogoUrl?: string; // Company logo on the card
+  companyLogoUrl?: string; // Company logo on the card (URL or dataURI)
   phone?: string;
   email: string;
   website?: string;
@@ -24,21 +24,23 @@ export interface StaffCardData {
 }
 
 export interface CardDesignSettings {
-  template: 'classic' | 'modern' | 'minimalist'; // Example templates
+  template: string; // Can be a unique ID like 'tech-modern' or general like 'classic'
   layout: 'image-left' | 'image-right' | 'image-top';
   colorScheme: {
-    cardBackground: string;
-    textColor: string;
-    primaryColor: string;
+    cardBackground: string; // hex
+    textColor: string; // hex
+    primaryColor: string; // hex
   };
   qrCodeUrl: string; // Generated based on fingerprintUrl for public card
+  // Font family customization could be added here later if needed
+  // fontFamily?: string; 
 }
 
 // Represents an Organization/Company in Firebase
 export interface CompanyProfile {
   id: string; // companyId
   name: string;
-  logoUrl?: string; // URL for the company logo
+  logoUrl?: string; // URL for the company logo (can be dataURI or external URL)
   industry?: string;
   size?: string;
   website?: string;
@@ -80,22 +82,19 @@ export interface StaffRecord {
   uniqueNfcIdentifier?: string; // For NFC card hardware
   cardDisplayData: StaffCardData;
   designSettings: CardDesignSettings;
-  cardsCreatedCount?: number; // This might be redundant if each staff has one card
+  cardsCreatedCount?: number;
   lastLoginAt?: Timestamp | string | null;
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
 
-// Represents a Card Template record in Firebase
-export interface CardTemplateRecord {
+// Represents a Card Template record in Firebase (conceptual, as templates are data objects for now)
+export interface AppCardTemplate {
   id: string; // templateId
   name: string;
-  description?: string;
-  designSettings: CardDesignSettings;
-  defaultCardDisplayData: Partial<StaffCardData>;
-  isDefaultCompanyTemplate?: boolean;
-  createdAt: Timestamp | string;
-  updatedAt: Timestamp | string;
+  description: string;
+  profile: StaffCardData;
+  design: CardDesignSettings;
 }
 
 export interface AccessCode {
@@ -119,19 +118,19 @@ export const defaultStaffCardData: StaffCardData = {
   twitter: '',
   github: '',
   address: '',
-  profilePictureUrl: '',
+  profilePictureUrl: `https://placehold.co/100x100.png`,
   cardBackgroundUrl: '',
   userInfo: '',
   targetAudience: '',
 };
 
 export const defaultCardDesignSettings: CardDesignSettings = {
-  template: 'classic',
+  template: 'default-minimal',
   layout: 'image-left',
   colorScheme: {
     cardBackground: '#FFFFFF',
-    textColor: '#333333',
-    primaryColor: '#3F51B5',
+    textColor: '#111827', // Dark Gray
+    primaryColor: '#3B82F6', // Blue
   },
   qrCodeUrl: '',
 };
@@ -142,8 +141,8 @@ export interface Team {
   description: string;
   managerId?: string;
   managerName?: string;
-  memberCount: number;
-  memberUserIds?: string[];
+  memberUserIds?: string[]; // Array of staff IDs
+  memberCount?: number; // Denormalized count of members
   assignedTemplates?: AssignedTemplate[];
   teamMetrics?: TeamMetrics;
   defaultTemplateId?: string;
@@ -152,7 +151,7 @@ export interface Team {
 }
 
 export interface AssignedTemplate {
-  id: string;
+  id: string; // templateId (from APP_TEMPLATES)
   name: string;
 }
 
@@ -163,7 +162,21 @@ export interface TeamMetrics {
   activeMembers: number;
 }
 
-export interface OrganizationUser {
+export interface DetailedTeam extends Team {
+  members: TeamMember[];
+}
+
+export interface TeamMember {
+  id: string; // Staff ID
+  name: string;
+  email: string;
+  role: StaffRole; // Role within the company, not team-specific role for now
+  cardsCreatedCount?: number;
+  averageSharesPerCard?: number;
+}
+
+
+export interface OrganizationUser { // Might be a bit redundant with StaffRecord if users don't log in
   id: string;
   name: string;
   email: string;
@@ -181,21 +194,34 @@ export interface ContactInfo {
   submittedAt: Timestamp | string;
 }
 
+export interface Role {
+  id: string;
+  name: string;
+  description: string;
+  permissions: RolePermission[];
+}
+export interface RolePermission {
+  id: string;
+  name: string;
+  description: string;
+}
+
+
 export interface AppPlan {
   id: PlanId;
   name: string;
-  price: string; // e.g., "R59" or "Contact Us"
-  priceMonthly: number; // Numeric price for calculations or Stripe, -1 for "Contact Us"
-  currencySymbol: string; // e.g., "R", "$"
-  frequency: string; // e.g., "/ month"
-  staffIncluded: string; // e.g., "1 (Solo)", "Up to 5"
+  price: string; 
+  priceMonthly: number; 
+  currencySymbol: string; 
+  frequency: string; 
+  staffIncluded: string; 
   features: string[];
-  extraStaffCost?: string; // e.g., "R39"
-  extraStaffUnit?: string; // e.g., "/month each"
-  userLimit: number; // Numeric limit for logic (derived from staffIncluded)
+  extraStaffCost?: string; 
+  extraStaffUnit?: string; 
+  userLimit: number; 
   isBusiness: boolean;
   popular?: boolean;
-  description?: string; // Short description of the plan
+  description?: string; 
 }
 
 export const APP_PLANS: AppPlan[] = [
@@ -209,11 +235,11 @@ export const APP_PLANS: AppPlan[] = [
     staffIncluded: '1 (Solo)',
     features: ['1 Digital card', 'QR/NFC sharing', 'Admin dashboard access', 'Basic templates', 'VCF download'],
     userLimit: 1,
-    isBusiness: false, // Typically individual plans are not "business" in terms of team features
+    isBusiness: false,
     description: "For solopreneurs, freelancers, and micro-businesses needing a professional digital presence.",
   },
   {
-    id: 'starter', // Internal ID, maps to "Business Starter"
+    id: 'starter',
     name: 'Business Starter',
     price: 'R249',
     priceMonthly: 249,
@@ -247,13 +273,412 @@ export const APP_PLANS: AppPlan[] = [
     id: 'enterprise',
     name: 'Enterprise',
     price: 'Custom Quote',
-    priceMonthly: -1, // Indicates custom pricing
+    priceMonthly: -1,
     currencySymbol: '',
     frequency: '',
     staffIncluded: '20+ Staff',
-    features: ['Everything in Growth', 'Unlimited staff (volume pricing)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
-    userLimit: Infinity,
+    features: ['Everything in Growth', 'Unlimited staff (volume pricing, e.g. R25–R35/user)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
+    userLimit: Infinity, // Or a very high number if Infinity causes issues in logic
     isBusiness: true,
     description: "Tailored solutions for large organizations and corporates with specific needs and high volume usage.",
   },
 ];
+
+
+// --- NEW TEMPLATES START HERE ---
+
+/**
+ * Template: Tech Innovator
+ * Industry: Technology
+ * Style: Modern, clean, dark theme with vibrant blue accents. Focus on social tech profiles.
+ */
+export const techInnovatorTemplate: AppCardTemplate = {
+  id: 'tech-innovator',
+  name: 'Tech Innovator',
+  description: 'Sleek and modern, for the forward-thinking tech professional.',
+  profile: {
+    name: 'Alex Turing',
+    title: 'AI Research Lead',
+    companyName: 'Innovate AI',
+    companyLogoUrl: `https://placehold.co/100x40.png`, // Placeholder for company logo
+    phone: '+1 555-0101',
+    email: 'alex.turing@innovate.ai',
+    website: 'innovate.ai/research',
+    linkedin: 'linkedin.com/in/alexturingai',
+    twitter: '@alexturingai',
+    github: 'github.com/alexturing',
+    address: '1 Quantum Leap, Silicon Valley, CA',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: '', // Uses color scheme for background
+    userInfo: 'Pioneering new frontiers in machine learning and ethical AI development. Seeking collaborators for impactful projects.',
+    targetAudience: 'AI researchers, tech investors, potential engineering talent.',
+  },
+  design: {
+    template: 'tech-modern',
+    layout: 'image-left',
+    colorScheme: {
+      cardBackground: '#1A202C', // Very Dark Blue (Charcoal)
+      textColor: '#E2E8F0', // Light Gray
+      primaryColor: '#3B82F6', // Vibrant Blue (Tailwind Blue 500)
+    },
+    qrCodeUrl: '', // Will be dynamically generated
+  },
+};
+
+/**
+ * Template: Legal Eagle
+ * Industry: Legal
+ * Style: Classic, authoritative, serif-implied (though uses sans-serif), with gold and navy accents.
+ */
+export const legalEagleTemplate: AppCardTemplate = {
+  id: 'legal-eagle',
+  name: 'Legal Eagle',
+  description: 'Traditional and trustworthy, for legal professionals.',
+  profile: {
+    name: 'Samantha Specter, Esq.',
+    title: 'Senior Partner',
+    companyName: 'Specter & Ross Legal Group',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0202',
+    email: 's.specter@specterross.com',
+    website: 'specterrosslegal.com',
+    linkedin: 'linkedin.com/in/samanthaspecter',
+    twitter: '',
+    github: '',
+    address: 'Suite 500, Liberty Tower, New York, NY',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: '',
+    userInfo: 'Over 20 years of experience in corporate litigation and M&A. Dedicated to achieving optimal outcomes for my clients.',
+    targetAudience: 'Corporate clients, legal peers, potential high-value cases.',
+  },
+  design: {
+    template: 'legal-classic',
+    layout: 'image-right',
+    colorScheme: {
+      cardBackground: '#FFFFFF', // Off-white
+      textColor: '#2D3748', // Dark Slate Gray
+      primaryColor: '#0A2342', // Navy Blue
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Healing Hands
+ * Industry: Medical
+ * Style: Clean, trustworthy, with calming blue and green tones.
+ */
+export const healingHandsTemplate: AppCardTemplate = {
+  id: 'healing-hands',
+  name: 'Healing Hands',
+  description: 'Calm and professional, for healthcare providers.',
+  profile: {
+    name: 'Dr. Elena Rodriguez',
+    title: 'Cardiologist',
+    companyName: 'City General Hospital',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0303',
+    email: 'e.rodriguez@citygeneral.org',
+    website: 'citygeneral.org/cardiology',
+    linkedin: 'linkedin.com/in/drelenarodriguez',
+    twitter: '',
+    github: '',
+    address: '123 Health Way, Medicity, TX',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: '',
+    userInfo: 'Board-certified cardiologist specializing in preventative care and cardiac rehabilitation. Committed to patient wellness.',
+    targetAudience: 'Patients, referring physicians, medical colleagues.',
+  },
+  design: {
+    template: 'medical-clean',
+    layout: 'image-left',
+    colorScheme: {
+      cardBackground: '#F0F9FF', // Very Light Blue
+      textColor: '#1E40AF', // Dark Blue
+      primaryColor: '#10B981', // Emerald Green
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Creative Spark
+ * Industry: Creative
+ * Style: Vibrant, dynamic, allows for strong imagery (background or photo).
+ */
+export const creativeSparkTemplate: AppCardTemplate = {
+  id: 'creative-spark',
+  name: 'Creative Spark',
+  description: 'Bold and artistic, for designers, artists, and photographers.',
+  profile: {
+    name: 'Leo Maxwell',
+    title: 'Graphic Designer & Illustrator',
+    companyName: 'Studio Max',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0404',
+    email: 'leo@studiomax.design',
+    website: 'studiomax.design',
+    linkedin: 'linkedin.com/in/leomaxwelldesign',
+    twitter: '@leomaxdesign',
+    github: 'github.com/leomax',
+    address: 'The Art Factory, Brooklyn, NY',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Encourages image
+    userInfo: 'Transforming ideas into visual stories. Specializing in branding, illustration, and web design. Let\'s create something amazing!',
+    targetAudience: 'Clients seeking design services, art directors, collaborators.',
+  },
+  design: {
+    template: 'creative-vibrant',
+    layout: 'image-top',
+    colorScheme: {
+      cardBackground: '#4A5568', // Medium Gray (can be overridden by bg image)
+      textColor: '#F7FAFC', // Light Gray (for good contrast on dark/image bg)
+      primaryColor: '#DD6B20', // Orange
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Solid Foundation
+ * Industry: Construction
+ * Style: Rugged, dependable, with earthy tones and clear information.
+ */
+export const solidFoundationTemplate: AppCardTemplate = {
+  id: 'solid-foundation',
+  name: 'Solid Foundation',
+  description: 'Strong and reliable, for construction and trades.',
+  profile: {
+    name: 'Mike Hammer',
+    title: 'General Contractor',
+    companyName: 'Hammer & Stone Builders',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0505',
+    email: 'mike@hammerstone.build',
+    website: 'hammerstone.build',
+    linkedin: 'linkedin.com/company/hammerstonebuilders',
+    twitter: '',
+    github: '',
+    address: '456 Builder Rd, Concreton, CA',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: '',
+    userInfo: 'Building dreams from the ground up. Quality craftsmanship and reliable project management for residential and commercial projects.',
+    targetAudience: 'Homeowners, property developers, architects.',
+  },
+  design: {
+    template: 'construction-rugged',
+    layout: 'image-right',
+    colorScheme: {
+      cardBackground: '#E2E8F0', // Light Gray
+      textColor: '#2D3748', // Dark Slate Gray
+      primaryColor: '#975A16', // Brown/Bronze
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Dream Weaver
+ * Industry: Real Estate
+ * Style: Elegant, inviting, with focus on property and contact.
+ */
+export const dreamWeaverTemplate: AppCardTemplate = {
+  id: 'dream-weaver',
+  name: 'Dream Weaver',
+  description: 'Polished and approachable, for real estate agents.',
+  profile: {
+    name: 'Sarah Keys',
+    title: 'Realtor',
+    companyName: 'Homestead Properties',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0606',
+    email: 'sarah.keys@homestead.com',
+    website: 'sarahkeyshomes.com',
+    linkedin: 'linkedin.com/in/sarahkeysrealtor',
+    twitter: '@sarahkeyshomes',
+    github: '',
+    address: '789 Realty Ave, Suburbia, FL',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Suggests a nice property photo
+    userInfo: 'Your trusted partner in finding the perfect home. Local market expert with a passion for helping families achieve their dreams.',
+    targetAudience: 'Home buyers, sellers, property investors.',
+  },
+  design: {
+    template: 'realestate-elegant',
+    layout: 'image-left',
+    colorScheme: {
+      cardBackground: '#FFFFFF',
+      textColor: '#4A5568', // Medium Gray
+      primaryColor: '#2F855A', // Dark Green
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Welcome Host
+ * Industry: Hospitality
+ * Style: Warm, friendly, service-oriented.
+ */
+export const welcomeHostTemplate: AppCardTemplate = {
+  id: 'welcome-host',
+  name: 'Welcome Host',
+  description: 'Inviting and professional, for hospitality roles.',
+  profile: {
+    name: 'David Lee',
+    title: 'Hotel Manager',
+    companyName: 'The Grand Resort & Spa',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0707',
+    email: 'd.lee@grandresort.com',
+    website: 'grandresort.com',
+    linkedin: 'linkedin.com/in/davidleehospitality',
+    twitter: '',
+    github: '',
+    address: '1 Paradise Ln, Resort City, CA',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: '',
+    userInfo: 'Ensuring every guest has an unforgettable experience. Dedicated to excellence in service and hospitality management.',
+    targetAudience: 'Hotel guests, event planners, corporate clients.',
+  },
+  design: {
+    template: 'hospitality-warm',
+    layout: 'image-top',
+    colorScheme: {
+      cardBackground: '#FFFBEB', // Light Yellow/Cream
+      textColor: '#7B341E', // Brown
+      primaryColor: '#C05621', // Dark Orange
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Knowledge Builder
+ * Industry: Education
+ * Style: Clean, accessible, with a focus on clarity and expertise.
+ */
+export const knowledgeBuilderTemplate: AppCardTemplate = {
+  id: 'knowledge-builder',
+  name: 'Knowledge Builder',
+  description: 'Clear and authoritative, for educators and academics.',
+  profile: {
+    name: 'Dr. Anya Sharma',
+    title: 'Professor of Astrophysics',
+    companyName: 'University of Science',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0808',
+    email: 'asharma@university.edu',
+    website: 'university.edu/asharma',
+    linkedin: 'linkedin.com/in/dranyasharma',
+    twitter: '@dranyasharma',
+    github: '',
+    address: 'Dept. of Physics, 1 Scholar Way, Academia, MA',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Subtle abstract or texture
+    userInfo: 'Astrophysicist researching dark matter and galaxy formation. Passionate about teaching and science communication.',
+    targetAudience: 'Students, academic peers, research institutions, science enthusiasts.',
+  },
+  design: {
+    template: 'education-academic',
+    layout: 'image-left',
+    colorScheme: {
+      cardBackground: '#F7FAFC', // Very Light Gray
+      textColor: '#2D3748', // Dark Slate Gray
+      primaryColor: '#4299E1', // Blue
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Financial Advisor
+ * Industry: Finance
+ * Style: Secure, trustworthy, sophisticated with dark blues or grays.
+ */
+export const financialAdvisorTemplate: AppCardTemplate = {
+  id: 'financial-advisor',
+  name: 'Financial Advisor',
+  description: 'Professional and trustworthy, for finance experts.',
+  profile: {
+    name: 'Mark Sterling',
+    title: 'Certified Financial Planner',
+    companyName: 'Sterling Wealth Management',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-0909',
+    email: 'mark.sterling@sterlingwealth.com',
+    website: 'sterlingwealth.com',
+    linkedin: 'linkedin.com/in/marksterlingcfp',
+    twitter: '',
+    github: '',
+    address: 'Suite 101, Finance Plaza, Wall Street, NY',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: '',
+    userInfo: 'Helping individuals and families achieve their financial goals through personalized planning and investment strategies.',
+    targetAudience: 'Potential clients, investors, financial partners.',
+  },
+  design: {
+    template: 'finance-secure',
+    layout: 'image-right',
+    colorScheme: {
+      cardBackground: '#0A2342', // Deep Navy
+      textColor: '#EBF8FF', // Very Light Blue/Off-white
+      primaryColor: '#D69E2E', // Gold/Bronze accent
+    },
+    qrCodeUrl: '',
+  },
+};
+
+/**
+ * Template: Wellness Guru
+ * Industry: Wellness
+ * Style: Natural, calming, organic feel with greens and earth tones.
+ */
+export const wellnessGuruTemplate: AppCardTemplate = {
+  id: 'wellness-guru',
+  name: 'Wellness Guru',
+  description: 'Calm and holistic, for wellness practitioners.',
+  profile: {
+    name: 'Chandra Devi',
+    title: 'Yoga Instructor & Holistic Coach',
+    companyName: 'Serene Living Wellness',
+    companyLogoUrl: `https://placehold.co/100x40.png`,
+    phone: '+1 555-1010',
+    email: 'chandra@sereneliving.com',
+    website: 'sereneliving.com',
+    linkedin: 'linkedin.com/in/chandradeviwellness',
+    twitter: '@serenechandra',
+    github: '',
+    address: 'The Zen Den, 1 Peaceful Path, Harmony, CA',
+    profilePictureUrl: `https://placehold.co/120x120.png`,
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, // Suggests nature or calm texture
+    userInfo: 'Guiding you on your journey to balance and well-being through yoga, meditation, and mindful living practices.',
+    targetAudience: 'Individuals seeking wellness services, yoga students, holistic health community.',
+  },
+  design: {
+    template: 'wellness-natural',
+    layout: 'image-top',
+    colorScheme: {
+      cardBackground: '#F0FFF4', // Honeydew (Very Light Green)
+      textColor: '#2F855A', // Dark Green
+      primaryColor: '#9AE6B4', // Lighter Green
+    },
+    qrCodeUrl: '',
+  },
+};
+
+// Array of all templates for use in the application
+export const APP_TEMPLATES: AppCardTemplate[] = [
+  techInnovatorTemplate,
+  legalEagleTemplate,
+  healingHandsTemplate,
+  creativeSparkTemplate,
+  solidFoundationTemplate,
+  dreamWeaverTemplate,
+  welcomeHostTemplate,
+  knowledgeBuilderTemplate,
+  financialAdvisorTemplate,
+  wellnessGuruTemplate,
+];
+
+// --- NEW TEMPLATES END HERE ---
