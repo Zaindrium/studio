@@ -1,42 +1,30 @@
 
 "use client";
 
-import type { CardDesignSettings } from '@/lib/types';
+import type { CardDesignSettings } from '@/lib/app-types'; // Updated import from lib/types to lib/app-types
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+// Select and RadioGroup are no longer needed here
 import { Input } from '@/components/ui/input';
-import { Palette, LayoutGrid, Nfc, Settings2, QrCode } from 'lucide-react';
+import { Palette, /* LayoutGrid, */ Nfc, Settings2, QrCode } from 'lucide-react'; // LayoutGrid removed
 import { useToast } from '@/hooks/use-toast';
-import React, { memo } from 'react'; // Added memo
+import React, { memo } from 'react';
 
 interface CardDesignerProps {
   design: CardDesignSettings;
-  onDesignChange: (newDesign: CardDesignSettings) => void;
+  onDesignChange: (newDesign: Partial<CardDesignSettings>) => void; // Changed to Partial as template/layout are not set here
 }
 
 const CardDesignerComponent = ({ design, onDesignChange }: CardDesignerProps) => {
   const { toast } = useToast();
 
-  const handleTemplateChange = (value: string) => {
-    onDesignChange({ ...design, template: value as CardDesignSettings['template'] });
-  };
-
-  const handleLayoutChange = (value: string) => {
-    onDesignChange({ ...design, layout: value as CardDesignSettings['layout'] });
-  };
+  // Template change handler is removed
+  // Layout change handler is removed
   
   const handleColorChange = (colorField: keyof CardDesignSettings['colorScheme'], value: string) => {
     onDesignChange({
-      ...design,
+      // ...design, // Spread existing design to keep other properties like template and layout
       colorScheme: {
         ...design.colorScheme,
         [colorField]: value,
@@ -52,16 +40,7 @@ const CardDesignerComponent = ({ design, onDesignChange }: CardDesignerProps) =>
         description: "Enable NFC on your phone and tap it to your tag to write your card URL.",
         duration: 7000, 
       });
-      // Actual WebNFC write logic would go here:
-      // const ndef = new (window as any).NDEFReader();
-      // ndef.write({
-      //   records: [{ recordType: "url", data: design.qrCodeUrl }]
-      // }).then(() => {
-      //   toast({ title: "Success!", description: "Card URL written to NFC tag." });
-      // }).catch((error: Error) => {
-      //   console.error("NFC write error:", error);
-      //   toast({ title: "NFC Error", description: `Could not write to tag: ${error.message}`, variant: "destructive" });
-      // });
+      // Actual WebNFC write logic would go here
     } else {
       toast({
         title: "WebNFC Not Supported",
@@ -79,41 +58,8 @@ const CardDesignerComponent = ({ design, onDesignChange }: CardDesignerProps) =>
         <CardTitle className="flex items-center text-2xl"><Settings2 className="mr-2 h-6 w-6 text-primary" />Card Customization</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div>
-          <Label htmlFor="template-select" className="flex items-center mb-2"><Palette className="mr-2 h-4 w-4" />Template</Label>
-          <Select value={design.template} onValueChange={handleTemplateChange}>
-            <SelectTrigger id="template-select" className="w-full">
-              <SelectValue placeholder="Select a template" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="classic">Classic</SelectItem>
-              <SelectItem value="modern">Modern</SelectItem>
-              <SelectItem value="minimalist">Minimalist</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="flex items-center mb-2"><LayoutGrid className="mr-2 h-4 w-4" />Layout (Profile Image Position)</Label>
-          <RadioGroup
-            value={design.layout}
-            onValueChange={handleLayoutChange}
-            className="flex flex-wrap gap-4"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="image-left" id="layout-left" />
-              <Label htmlFor="layout-left">Image Left</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="image-right" id="layout-right" />
-              <Label htmlFor="layout-right">Image Right</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="image-top" id="layout-top" />
-              <Label htmlFor="layout-top">Image Top</Label>
-            </div>
-          </RadioGroup>
-        </div>
+        {/* Template Selection Removed */}
+        {/* Layout Selection Removed */}
 
         <div className="space-y-4">
             <Label className="flex items-center mb-2"><Palette className="mr-2 h-4 w-4" />Card Color Scheme</Label>
@@ -156,7 +102,7 @@ const CardDesignerComponent = ({ design, onDesignChange }: CardDesignerProps) =>
           <Input 
             id="qr-url" 
             value={design.qrCodeUrl} 
-            onChange={(e) => onDesignChange({...design, qrCodeUrl: e.target.value})}
+            onChange={(e) => onDesignChange({ qrCodeUrl: e.target.value })} // Only updates qrCodeUrl
             placeholder="e.g., https://your-domain.com/card-id"
           />
         </div>
