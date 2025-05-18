@@ -1,12 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -15,10 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { // Keep DialogTrigger and DialogClose for now, as they are used outside the lazy-loaded component
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,17 +23,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Contact as ContactIcon, Search, MoreVertical, Trash2, Eye, PlusCircle, MessageSquare } from 'lucide-react';
 import type { ContactInfo } from '@/lib/app-types';
-import { useToast } from '@/hooks/use-toast'; // Assuming useToast is small or used elsewhere
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { // Keep AlertDialogCancel and AlertDialogAction for now
- AlertDialogAction,
- AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Dynamically import components that are not immediately needed
 const LazyAddContactDialog = React.lazy(() => import('@/components/contacts/add-contact-dialog'));
 const LazyDeleteContactAlert = React.lazy(() => import('@/components/contacts/delete-contact-alert'));
-const LazyViewMessageAlert = React.lazy(() => import('@/components/contacts/view-message-alert')); // Assuming you might want a dedicated modal later
+const LazyViewMessageAlert = React.lazy(() => import('@/components/contacts/view-message-alert'));
 
 const CONTACTS_STORAGE_KEY = 'linkup_collected_contacts';
 
@@ -47,15 +37,19 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<ContactInfo[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
 
-  const [isAddManualContactDialogOpen, setIsAddManualContactDialogOpen] = useState(false); // Keep state here
+  const [isAddManualContactDialogOpen, setIsAddManualContactDialogOpen] = useState(false);
   const [isSubmittingManualContact, setIsSubmittingManualContact] = useState(false);
 
   const [isDeleteContactAlertOpen, setIsDeleteContactAlertOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<ContactInfo | null>(null);
 
+  const [isViewMessageAlertOpen, setIsViewMessageAlertOpen] = useState(false);
+  const [contactToViewMessage, setContactToViewMessage] = useState<ContactInfo | null>(null);
 
   useEffect(() => {
+    setIsLoadingContacts(true);
     try {
       const storedContactsRaw = localStorage.getItem(CONTACTS_STORAGE_KEY);
       if (storedContactsRaw) {
@@ -70,6 +64,8 @@ export default function ContactsPage() {
         description: "Could not retrieve contact list from local storage.",
         variant: "destructive",
       });
+    } finally {
+        setIsLoadingContacts(false);
     }
   }, [toast]);
 
@@ -108,8 +104,13 @@ export default function ContactsPage() {
         setContactToDelete(null);
     }
   };
+
+  const handleOpenViewMessageDialog = (contact: ContactInfo) => {
+    setContactToViewMessage(contact);
+    setIsViewMessageAlertOpen(true);
+  };
   
-  const formatSubmittedDate = (dateString: string) => {
+  const formatSubmittedDate = (dateString: string | Date) => {
     try {
       return `${formatDistanceToNow(new Date(dateString))} ago`;
     } catch (e) {
@@ -118,28 +119,24 @@ export default function ContactsPage() {
   };
 
   const handleOpenManualAddDialog = () => {
-    setIsAddManualContactDialogOpen(true); // Only open the dialog
+    setIsAddManualContactDialogOpen(true);
   };
 
-  const handleSubmitManualContact = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!manualContactName.trim() || !manualContactEmail.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide at least Name and Email for the contact.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleSubmitManualContact = async (data: {
+    name: string;
+    email: string;
+    phone?: string;
+    company?: string;
+    message?: string;
+  }) => {
     setIsSubmittingManualContact(true);
-
     const newContact: ContactInfo = {
       id: `manual-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      name: manualContactName,
-      email: manualContactEmail,
-      phone: manualContactPhone || undefined,
-      company: manualContactCompany || undefined,
-      message: manualContactMessage || undefined,
+      name: data.name,
+      email: data.email,
+      phone: data.phone || undefined,
+      company: data.company || undefined,
+      message: data.message || undefined,
       submittedFromCardId: 'manual_entry', 
       submittedAt: new Date().toISOString(),
     };
@@ -152,7 +149,7 @@ export default function ContactsPage() {
 
       toast({
         title: "Contact Added Manually!",
-        description: `${manualContactName} has been added to your contacts.`,
+        description: `${data.name} has been added to your contacts.`,
       });
       setIsAddManualContactDialogOpen(false);
     } catch (e) {
@@ -167,6 +164,22 @@ export default function ContactsPage() {
     }
   };
 
+  if (isLoadingContacts) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-10 w-1/3 mb-4" />
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -226,8 +239,8 @@ export default function ContactsPage() {
                           View Details
                         </DropdownMenuItem>
                         {contact.message && 
-                          <DropdownMenuItem onClick={() => alert(`Message from ${contact.name}:\n\n${contact.message}`)}>
-                            <MessageSquare className="mr-2 h-4 w-4" /> {/* Consider replacing alert with a modal and lazy loading it */}
+                          <DropdownMenuItem onClick={() => handleOpenViewMessageDialog(contact)}>
+                            <MessageSquare className="mr-2 h-4 w-4" />
                             View Message
                           </DropdownMenuItem>
                         }
@@ -263,29 +276,38 @@ export default function ContactsPage() {
         </CardFooter>
       )}
 
- {/* Dynamically loaded Add Contact Dialog */}
- {isAddManualContactDialogOpen && (
-  <React.Suspense fallback={<div>Loading Dialog...</div>}>
-  <LazyAddContactDialog
-  isOpen={isAddManualContactDialogOpen}
-  onClose={() => setIsAddManualContactDialogOpen(false)}
-  onSubmit={handleSubmitManualContact}
-  isSubmitting={isSubmittingManualContact}
-  />
-  </React.Suspense>
- )}
+    <Suspense fallback={<div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50"><Skeleton className="w-11/12 max-w-md h-96" /></div>}>
+      {isAddManualContactDialogOpen && (
+        <LazyAddContactDialog
+          isOpen={isAddManualContactDialogOpen}
+          onClose={() => setIsAddManualContactDialogOpen(false)}
+          onSubmit={handleSubmitManualContact}
+          isSubmitting={isSubmittingManualContact}
+        />
+      )}
+    </Suspense>
 
- {/* Dynamically loaded Delete Contact Alert Dialog */}
- {isDeleteContactAlertOpen && (
-  <React.Suspense fallback={<div>Loading Alert...</div>}>
-  <LazyDeleteContactAlert
-  isOpen={isDeleteContactAlertOpen}
-  onClose={() => setIsDeleteContactAlertOpen(false)}
-  onConfirm={handleDeleteContact}
-  contactName={contactToDelete?.name} // Pass contact name for context
-  />
-  </React.Suspense>
- )}
+    <Suspense fallback={<div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50"><Skeleton className="w-11/12 max-w-md h-48" /></div>}>
+      {isDeleteContactAlertOpen && contactToDelete && (
+        <LazyDeleteContactAlert
+          isOpen={isDeleteContactAlertOpen}
+          onClose={() => setIsDeleteContactAlertOpen(false)}
+          onConfirm={handleDeleteContact}
+          contactName={contactToDelete.name} 
+        />
+      )}
+    </Suspense>
+
+    <Suspense fallback={<div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50"><Skeleton className="w-11/12 max-w-md h-60" /></div>}>
+      {isViewMessageAlertOpen && contactToViewMessage && (
+        <LazyViewMessageAlert
+            isOpen={isViewMessageAlertOpen}
+            onClose={() => setIsViewMessageAlertOpen(false)}
+            contactName={contactToViewMessage.name}
+            message={contactToViewMessage.message}
+        />
+      )}
+    </Suspense>
     </Card>
   );
 }
