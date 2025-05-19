@@ -11,11 +11,12 @@ import Link from 'next/link';
 import { UserPlus, Mail, Key, Building, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, sendEmailVerification } from 'firebase/auth'; // Added sendEmailVerification
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { CompanyProfile, AdminUser, PlanId } from '@/lib/app-types';
+import { APP_PLANS } from '@/lib/app-types';
 
-const DEFAULT_INITIAL_PLAN: PlanId = 'growth';
+const DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY: PlanId = APP_PLANS.find(p => p.id === 'growth')?.id || 'growth';
 
 // Inline SVG for Google Icon
 const GoogleIcon = () => (
@@ -35,16 +36,16 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  const handlePostAuthSetup = async (user: User, isGoogleSignUp: boolean = false) => {
-    const effectiveAdminName = isGoogleSignUp ? (user.displayName || "Google User") : adminName;
-    const effectiveCompanyName = companyName || (isGoogleSignUp ? `${effectiveAdminName}'s Company` : "My New Company");
+  const handlePostAuthSetup = async (user: User, isGoogleSignUp: boolean = false, formCompanyName?: string, formAdminName?: string) => {
+    const effectiveAdminName = formAdminName || (isGoogleSignUp ? (user.displayName || "Google User") : adminName);
+    const effectiveCompanyName = formCompanyName || (isGoogleSignUp ? `${effectiveAdminName}'s Company` : companyName);
 
     // Create Company Profile in Firestore
     const companyRef = doc(db, "companies", user.uid);
     const companyProfile: CompanyProfile = {
-      id: user.uid,
+      id: user.uid, // companyId is the admin's UID
       name: effectiveCompanyName,
-      activePlanId: DEFAULT_INITIAL_PLAN,
+      activePlanId: DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -60,7 +61,7 @@ export default function SignupPage() {
       email: user.email || '',
       emailVerified: user.emailVerified,
       role: 'Owner',
-      status: 'Active',
+      status: 'Active', // Set to Active as setup is complete
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -71,18 +72,14 @@ export default function SignupPage() {
       description: `Welcome, ${effectiveAdminName}! Please select your subscription plan.`,
       variant: "default",
     });
-    router.push('/subscription');
+    router.push('/subscription'); // Changed from /dashboard to /subscription
   };
 
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
-    toast({
-      title: "Creating Company Account...",
-      description: "Please wait while we set up your company and admin account.",
-    });
-
+    
     if (password !== confirmPassword) {
       toast({ title: "Password Mismatch", description: "Passwords do not match.", variant: "destructive" });
       setIsLoading(false);
@@ -94,9 +91,22 @@ export default function SignupPage() {
       return;
     }
 
+    toast({
+      title: "Creating Company Account...",
+      description: "Please wait while we set up your company and admin account.",
+    });
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await handlePostAuthSetup(userCredential.user);
+      await sendEmailVerification(userCredential.user);
+      
+      toast({
+        title: "Account Registered!",
+        description: "Please check your email to verify your account before logging in.",
+        duration: 7000,
+      });
+      router.push('/verify-email'); 
+      // handlePostAuthSetup is NOT called here for email/password, it's deferred to after login and verification.
     } catch (error: any) {
       console.error("Error during admin & company signup:", error);
       let description = "Could not create your account. Please try again.";
@@ -121,10 +131,18 @@ export default function SignupPage() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      // If companyName or adminName aren't set (because this is the Google flow),
-      // handlePostAuthSetup will use defaults or user.displayName.
-      // For a better UX, you might prompt for companyName if it's empty after Google sign-up.
-      await handlePostAuthSetup(result.user, true);
+      if (result.user.emailVerified) {
+        // Pass companyName and adminName from state if available, otherwise defaults will be used
+        await handlePostAuthSetup(result.user, true, companyName, adminName);
+      } else {
+        await sendEmailVerification(result.user);
+        toast({
+          title: "Verify Your Google Email",
+          description: "Please check your email to verify your Google account. This is unusual but required to proceed.",
+          duration: 7000,
+        });
+        router.push('/verify-email');
+      }
     } catch (error: any) {
       console.error("Google Sign-Up Failed:", error);
       let description = "Could not sign up with Google. Please try again or use email/password.";
@@ -247,3 +265,5 @@ export default function SignupPage() {
     </Card>
   );
 }
+
+    

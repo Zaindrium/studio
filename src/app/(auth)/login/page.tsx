@@ -7,8 +7,11 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Mail, Key, LogIn, HelpCircle, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import type { CompanyProfile, AdminUser, PlanId } from '@/lib/app-types';
+import { APP_PLANS } from '@/lib/app-types';
 
 const Button = lazy(() => import("@/components/ui/button").then(m => ({ default: m.Button })));
 const Card = lazy(() => import("@/components/ui/card").then(m => ({ default: m.Card })));
@@ -19,15 +22,14 @@ const CardHeader = lazy(() => import("@/components/ui/card").then(m => ({ defaul
 const CardTitle = lazy(() => import("@/components/ui/card").then(m => ({ default: m.CardTitle })));
 const Input = lazy(() => import("@/components/ui/input").then(m => ({ default: m.Input })));
 const Label = lazy(() => import("@/components/ui/label").then(m => ({ default: m.Label })));
-// const Separator = lazy(() => import("@/components/ui/separator").then(m => ({ default: m.Separator })));
 
-// Inline SVG for Google Icon as lucide-react doesn't have it by default.
+const DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY: PlanId = APP_PLANS.find(p => p.id === 'growth')?.id || 'growth';
+
 const GoogleIcon = () => (
   <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
     <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
   </svg>
 );
-
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,6 +38,54 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const performPostLoginSetupIfNeeded = async (user: User) => {
+    const adminRef = doc(db, `companies/${user.uid}/admins`, user.uid);
+    const adminDocSnap = await getDoc(adminRef);
+
+    if (!adminDocSnap.exists()) {
+      // Account setup was deferred (likely an email/password signup that just got verified)
+      // Or a first-time Google Sign-In that didn't complete initial setup.
+      toast({
+        title: "Completing Account Setup...",
+        description: "Creating your company and admin profile.",
+      });
+
+      const defaultAdminName = user.displayName || user.email?.split('@')[0] || 'Admin User';
+      const defaultCompanyName = `${defaultAdminName}'s Company`;
+
+      // Create Company Profile
+      const companyRef = doc(db, "companies", user.uid);
+      const companyProfile: CompanyProfile = {
+        id: user.uid,
+        name: defaultCompanyName,
+        activePlanId: DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(companyRef, companyProfile);
+
+      // Create Admin User Profile
+      const adminProfile: AdminUser = {
+        id: user.uid,
+        companyId: user.uid,
+        companyName: defaultCompanyName,
+        name: defaultAdminName,
+        email: user.email || '',
+        emailVerified: user.emailVerified,
+        role: 'Owner',
+        status: 'Active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(adminRef, adminProfile);
+      
+      // After setup, it's good to redirect them to subscription page if it's a brand new setup
+      router.push('/subscription');
+      return true; // Indicates setup was performed and navigation handled
+    }
+    return false; // Setup was not needed or already done
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -46,7 +96,23 @@ export default function LoginPage() {
     });
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      if (!user.emailVerified) {
+        toast({
+          title: "Email Not Verified",
+          description: "Please check your inbox for the verification link.",
+          variant: "destructive",
+          duration: 7000,
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      const setupPerformedAndNavigated = await performPostLoginSetupIfNeeded(user);
+      if (setupPerformedAndNavigated) return; // Navigation handled by setup
+
       toast({
         title: "Admin Login Successful!",
         description: "Redirecting to your Business Dashboard...",
@@ -81,7 +147,25 @@ export default function LoginPage() {
     });
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Google emails are usually verified, but good to check
+      if (!user.emailVerified) {
+          toast({
+            title: "Verify Your Google Email",
+            description: "Please verify your Google email address through any confirmation sent by Google. This is unusual but necessary.",
+            variant: "destructive",
+            duration: 9000,
+          });
+          setIsGoogleLoading(false);
+          return;
+      }
+
+      const setupPerformedAndNavigated = await performPostLoginSetupIfNeeded(user);
+      if (setupPerformedAndNavigated) return; // Navigation handled by setup
+
+
       toast({
         title: "Google Sign-In Successful!",
         description: "Redirecting to your dashboard...",
@@ -120,8 +204,6 @@ export default function LoginPage() {
       });
       return;
     }
-    // In a real app, you'd call firebase.auth().sendPasswordResetEmail(email)
-    // For now, this is simulated.
     toast({
       title: "Password Reset (Simulated)",
       description: `If an account exists for ${email}, a password reset link would be sent. (This is a simulation)`,
@@ -211,3 +293,5 @@ export default function LoginPage() {
     </Suspense>
   );
 }
+
+    
