@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { KeySquare, UserCircle, Mail, Phone, Globe, Linkedin, Twitter, Github, MapPin, Building, Info, Save, CheckCircle } from 'lucide-react';
+import { KeySquare, UserCircle, Mail, Phone, Globe, Linkedin, MapPin, Building, Info, Save, CheckCircle } from 'lucide-react'; // Removed Twitter, Github
 import { useToast } from '@/hooks/use-toast';
 import type { StaffCardData } from '@/lib/app-types';
 import { defaultStaffCardData } from '@/lib/app-types'; // For form defaults
@@ -199,14 +199,7 @@ export default function EmployeeAccessPage() {
                     <Label htmlFor="staffLinkedin" className="flex items-center"><Linkedin className="mr-2 h-4 w-4 text-primary"/>LinkedIn Profile URL (Optional)</Label>
                     <Input id="staffLinkedin" value={formData.linkedin || ''} onChange={e => handleInputChange('linkedin', e.target.value)} placeholder="linkedin.com/in/yourprofile" />
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="staffTwitter" className="flex items-center"><Twitter className="mr-2 h-4 w-4 text-primary"/>Twitter Handle (Optional)</Label>
-                    <Input id="staffTwitter" value={formData.twitter || ''} onChange={e => handleInputChange('twitter', e.target.value)} placeholder="@yourhandle" />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="staffGithub" className="flex items-center"><Github className="mr-2 h-4 w-4 text-primary"/>GitHub Username (Optional)</Label>
-                    <Input id="staffGithub" value={formData.github || ''} onChange={e => handleInputChange('github', e.target.value)} placeholder="yourusername" />
-                </div>
+                {/* Twitter and GitHub fields removed */}
                 <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="staffAddress" className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary"/>Address (Optional)</Label>
                     <Input id="staffAddress" value={formData.address || ''} onChange={e => handleInputChange('address', e.target.value)} placeholder="Your Full Address" />
@@ -233,6 +226,3 @@ export default function EmployeeAccessPage() {
     </div>
   );
 }
-
-
-    

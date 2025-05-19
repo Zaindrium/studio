@@ -11,11 +11,11 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { UserProfile } from '@/lib/types';
+import type { UserProfile } from '@/lib/types'; // This type might need adjustment if it also included twitter/github
 // Import only the tool function and the output type, not the schema object directly from the 'use server' tool file.
 import { scrapeWebpageTool, type ScrapeWebpageOutput } from '@/ai/tools/web-scraper-tool';
 
-// Define the input schema based on UserProfile fields relevant to the AI
+// Define the input schema based on StaffCardData fields relevant to the AI
 const ProposeCardEnhancementsInputSchema = z.object({
   name: z.string().optional(),
   title: z.string().optional(),
@@ -24,8 +24,8 @@ const ProposeCardEnhancementsInputSchema = z.object({
   email: z.string().optional(),
   website: z.string().optional().describe("User's personal or company website URL."),
   linkedin: z.string().optional().describe("User's LinkedIn profile URL."),
-  twitter: z.string().optional().describe("User's Twitter profile URL (content not scraped)."),
-  github: z.string().optional().describe("User's GitHub profile URL."),
+  // twitter: z.string().optional().describe("User's Twitter profile URL (content not scraped)."), // Removed
+  // github: z.string().optional().describe("User's GitHub profile URL."), // Removed
   address: z.string().optional(),
   profilePictureUrl: z.string().optional().or(z.literal('')),
   cardBackgroundUrl: z.string().optional().or(z.literal('')),
@@ -54,8 +54,6 @@ export async function proposeCardEnhancements(input: ProposeCardEnhancementsInpu
 }
 
 // Re-define the ScrapeWebpageOutputSchema locally for use in this flow's PromptInputSchema.
-// This is necessary because Zod schema objects cannot be directly exported from 'use server' files.
-// The definition should match the one used internally by the scrapeWebpageTool.
 const LocalScrapeWebpageOutputSchema = z.object({
   scrapedText: z.string().optional().describe('The extracted text content from the webpage. May be truncated or limited.'),
   error: z.string().optional().describe('An error message if scraping failed.'),
@@ -66,7 +64,7 @@ const LocalScrapeWebpageOutputSchema = z.object({
 const PromptInputSchema = ProposeCardEnhancementsInputSchema.extend({
   websiteScrapedContent: LocalScrapeWebpageOutputSchema.optional().describe('Scraped content from the user\'s website URL.'),
   linkedinScrapedContent: LocalScrapeWebpageOutputSchema.optional().describe('Scraped content from the user\'s LinkedIn URL.'),
-  githubScrapedContent: LocalScrapeWebpageOutputSchema.optional().describe('Scraped content from the user\'s GitHub URL.'),
+  // githubScrapedContent: LocalScrapeWebpageOutputSchema.optional().describe('Scraped content from the user\'s GitHub URL.'), // Removed
 });
 type PromptInput = z.infer<typeof PromptInputSchema>;
 
@@ -76,7 +74,7 @@ const prompt = ai.definePrompt({
   input: {schema: PromptInputSchema},
   output: {schema: ProposeCardEnhancementsOutputSchema},
   prompt: `You are an expert AI assistant specializing in designing compelling digital business cards.
-Analyze the user's profile information AND any scraped content from their provided URLs (Website, LinkedIn, GitHub) to generate suggestions.
+Analyze the user's profile information AND any scraped content from their provided URLs (Website, LinkedIn) to generate suggestions.
 
 User Profile:
 - Name: {{name}}
@@ -96,13 +94,6 @@ User Profile:
     {{#if linkedinScrapedContent.scrapedText}}"{{{linkedinScrapedContent.scrapedText}}}"{{else}}"N/A"{{/if}}
   {{#if linkedinScrapedContent.error}} (Note: {{linkedinScrapedContent.error}}){{/if}}
 {{/if}}
-- GitHub: {{github}}
-{{#if githubScrapedContent}}
-  - GitHub Content Snippet (Status: {{githubScrapedContent.status}}):
-    {{#if githubScrapedContent.scrapedText}}"{{{githubScrapedContent.scrapedText}}}"{{else}}"N/A"{{/if}}
-  {{#if githubScrapedContent.error}} (Note: {{githubScrapedContent.error}}){{/if}}
-{{/if}}
-- Twitter: {{twitter}} (Content not scraped)
 - Address: {{address}}
 - Current 'About Me'/Interests: {{userInfo}}
 - Target Audience: {{targetAudience}}
@@ -113,8 +104,8 @@ Your tasks are to:
 1.  **Suggest "About Me" Text:** Based on the *entire profile*, including scraped content if useful, generate a concise and professional "About Me" text (under 200 characters). If 'userInfo' is provided, refine it. If scraped content from LinkedIn (e.g., a summary) or a personal website (e.g., an intro paragraph) is high quality, leverage it. If scraping failed or returned poor content (like a login page), rely more on the user's direct input for 'userInfo' and other profile fields.
 2.  **Suggest Layout:** Choose one of 'image-left', 'image-right', or 'image-top'. Consider the user's profession (e.g., creative vs. corporate) which might be inferred from their profile or scraped content.
 3.  **Suggest Color Scheme:** Provide hex codes for 'cardBackground', 'textColor', and 'primaryColor'. Consider common color psychologies for the target audience. If a card background image is present, or if scraped website content hints at existing branding, suggest colors that would complement it.
-4.  **Suggest Keywords for Background (Optional):** If the user doesn't have a background or wants ideas, suggest 2-3 keywords or themes. These can be inspired by their profession, interests, or themes from their website/GitHub.
-5.  **Provide Actionable Feedback (Optional):** Offer 1-2 brief suggestions. This could be about missing info or leveraging something from their scraped content (e.g., "Your GitHub shows strong React skills; consider mentioning this in your 'About Me'").
+4.  **Suggest Keywords for Background (Optional):** If the user doesn't have a background or wants ideas, suggest 2-3 keywords or themes. These can be inspired by their profession, interests, or themes from their website.
+5.  **Provide Actionable Feedback (Optional):** Offer 1-2 brief suggestions. This could be about missing info or leveraging something from their scraped content.
 
 Prioritize information directly provided by the user if scraped content is unavailable, nonsensical (e.g., login page text, HTML boilerplate), or very limited.
 If scraped content IS available and seems relevant, use it to make your suggestions more specific and insightful.
@@ -156,17 +147,7 @@ const proposeCardEnhancementsFlow = ai.defineFlow(
         scrapingNotes.push(`LinkedIn (${input.linkedin}): Tool invocation error - ${e.message}`);
       }
     }
-    if (input.github) {
-      try {
-        const result = await scrapeWebpageTool({ url: input.github });
-        promptInput.githubScrapedContent = result;
-        if (result.status === 'error') scrapingNotes.push(`GitHub (${input.github}): ${result.error}`);
-        else if (result.status === 'empty_content') scrapingNotes.push(`GitHub (${input.github}): ${result.error || 'Content was minimal or not found.'}`);
-      } catch (e: any) {
-        promptInput.githubScrapedContent = { error: `Scraping tool error: ${e.message}`, status: 'error' };
-        scrapingNotes.push(`GitHub (${input.github}): Tool invocation error - ${e.message}`);
-      }
-    }
+    // GitHub scraping removed
 
     const {output} = await prompt(promptInput);
     if (!output) {
@@ -175,7 +156,7 @@ const proposeCardEnhancementsFlow = ai.defineFlow(
     
     output.suggestedKeywordsForBackground = output.suggestedKeywordsForBackground || [];
     output.actionableFeedback = output.actionableFeedback || [];
-    output.scrapingNotes = scrapingNotes.length > 0 ? scrapingNotes : undefined; // Add scraping notes to output
+    output.scrapingNotes = scrapingNotes.length > 0 ? scrapingNotes : undefined; 
 
     return output;
   }

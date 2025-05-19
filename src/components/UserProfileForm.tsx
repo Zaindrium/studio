@@ -18,20 +18,20 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Briefcase, Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2 } from 'lucide-react';
+import { User, Briefcase, Phone, Mail, Globe, Linkedin, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2 } from 'lucide-react'; // Removed Twitter, Github
 import React, { useRef, memo } from 'react';
 
 // Schema reflects fields for StaffCardData
 const staffCardSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
-  companyName: z.string().optional(), // Changed from company
+  companyName: z.string().optional(), 
   phone: z.string().optional(),
   email: z.string().email({ message: 'Invalid email address.' }),
   website: z.string().url({ message: 'Invalid URL.' }).optional().or(z.literal('')),
   linkedin: z.string().optional(),
-  twitter: z.string().optional(),
-  github: z.string().optional(),
+  // twitter: z.string().optional(), // Removed
+  // github: z.string().optional(), // Removed
   address: z.string().optional(),
   profilePictureUrl: z.string().optional().or(z.literal('')),
   cardBackgroundUrl: z.string().optional().or(z.literal('')),
@@ -42,8 +42,8 @@ const staffCardSchema = z.object({
 type StaffCardFormValues = z.infer<typeof staffCardSchema>;
 
 interface UserProfileFormProps {
-  profile: StaffCardData; // Updated to StaffCardData
-  onProfileChange: (data: Partial<StaffCardData>) => void; // Updated to StaffCardData
+  profile: StaffCardData; 
+  onProfileChange: (data: Partial<StaffCardData>) => void; 
 }
 
 const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormProps) => {
@@ -61,10 +61,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
 
   React.useEffect(() => {
     const subscription = form.watch((value) => {
-      // This callback updates the parent state on every form change.
-      // This is a common pattern but can lead to frequent re-renders.
-      // For more complex forms, consider debouncing or updating on blur/submit.
-      onProfileChange(value as Partial<StaffCardData>); // Updated to StaffCardData
+      onProfileChange(value as Partial<StaffCardData>); 
     });
     return () => subscription.unsubscribe();
   }, [form, onProfileChange]);
@@ -120,7 +117,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
               />
               <FormField
                 control={form.control}
-                name="companyName" // Changed from company
+                name="companyName" 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center"><Briefcase className="mr-2 h-4 w-4" />Company Name (on card, Optional)</FormLabel>
@@ -183,32 +180,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="twitter"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center"><Twitter className="mr-2 h-4 w-4" />Twitter Handle (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. @johndoe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="github"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center"><Github className="mr-2 h-4 w-4" />GitHub Username (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. johndoe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Twitter and GitHub fields removed */}
               <FormField
                 control={form.control}
                 name="address"
@@ -280,7 +252,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                 <FormItem>
                   <FormLabel className="flex items-center"><ImagePlus className="mr-2 h-4 w-4" />Card Background Image</FormLabel>
                   <FormControl>
-                    <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+                     <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                       <Input
                         type="file"
                         accept="image/*"

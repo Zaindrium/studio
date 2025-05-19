@@ -14,8 +14,8 @@ export interface StaffCardData {
   email: string;
   website?: string;
   linkedin?: string;
-  twitter?: string;
-  github?: string;
+  // twitter?: string; // Removed
+  // github?: string; // Removed
   address?: string;
   profilePictureUrl?: string; // Can be dataURI or external URL
   cardBackgroundUrl?: string; // Can be dataURI or external URL
@@ -113,17 +113,17 @@ export const defaultStaffCardData: StaffCardData = {
   email: '',
   website: '',
   linkedin: '',
-  twitter: '',
-  github: '',
+  // twitter: '', // Removed
+  // github: '', // Removed
   address: '',
   profilePictureUrl: `https://placehold.co/120x120.png`,
-  cardBackgroundUrl: '', // Default to no background image, will use colorScheme
+  cardBackgroundUrl: '', 
   userInfo: '',
   targetAudience: '',
 };
 
 export const defaultCardDesignSettings: CardDesignSettings = {
-  template: 'tech-innovator', // Default to one of the new templates
+  template: 'tech-innovator',
   layout: 'image-left',
   colorScheme: {
     cardBackground: '#1A202C', 
@@ -131,7 +131,7 @@ export const defaultCardDesignSettings: CardDesignSettings = {
     primaryColor: '#3B82F6',
   },
   qrCodeUrl: '',
-  aiHint: 'tech abstract', // Default AI hint
+  aiHint: 'tech abstract',
 };
 
 export interface Team {
@@ -234,11 +234,11 @@ export const APP_PLANS: AppPlan[] = [
     staffIncluded: '1 (Solo)',
     features: ['1 Digital card', 'QR/NFC sharing', 'Admin dashboard access', 'Basic templates', 'VCF download'],
     userLimit: 1,
-    isBusiness: false, // This is a personal/solo plan
+    isBusiness: false, 
     description: "For solopreneurs and individuals needing a professional digital presence.",
   },
   {
-    id: 'starter', // Was 'business-starter'
+    id: 'starter', 
     name: 'Business Starter',
     price: 'R249',
     priceMonthly: 249,
@@ -253,7 +253,7 @@ export const APP_PLANS: AppPlan[] = [
     description: "Designed for small businesses and teams looking to manage multiple digital cards.",
   },
   {
-    id: 'growth', // Was 'business-growth'
+    id: 'growth', 
     name: 'Business Growth',
     price: 'R499',
     priceMonthly: 499,
@@ -272,8 +272,8 @@ export const APP_PLANS: AppPlan[] = [
     id: 'enterprise',
     name: 'Enterprise',
     price: 'Custom Quote',
-    priceMonthly: -1, // Indicates custom pricing
-    currencySymbol: 'R', // Can still be ZAR for quote basis
+    priceMonthly: -1, 
+    currencySymbol: 'R', 
     frequency: '',
     staffIncluded: '20+ Staff',
     features: ['Everything in Growth', 'Unlimited staff (custom volume pricing)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
@@ -304,8 +304,8 @@ export const techInnovatorTemplate: AppCardTemplate = {
     email: 'alex.turing@innovate.ai',
     website: 'innovate.ai/research',
     linkedin: 'linkedin.com/in/alexturingai',
-    twitter: '@alexturingai',
-    github: 'github.com/alexturing',
+    // twitter: '@alexturingai', // Removed
+    // github: 'github.com/alexturing', // Removed
     address: '1 Quantum Leap, Silicon Valley, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`, 
@@ -344,8 +344,8 @@ export const legalEagleTemplate: AppCardTemplate = {
     email: 's.specter@specterross.com',
     website: 'specterrosslegal.com',
     linkedin: 'linkedin.com/in/samanthaspecter',
-    twitter: '',
-    github: '',
+    // twitter: '', // Removed
+    // github: '', // Removed
     address: 'Suite 500, Liberty Tower, New York, NY',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`,
@@ -384,8 +384,8 @@ export const healingHandsTemplate: AppCardTemplate = {
     email: 'e.rodriguez@citygeneral.org',
     website: 'citygeneral.org/cardiology',
     linkedin: 'linkedin.com/in/drelenarodriguez',
-    twitter: '',
-    github: '',
+    // twitter: '', // Removed
+    // github: '', // Removed
     address: '123 Health Way, Medicity, TX',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`,
@@ -424,8 +424,8 @@ export const creativeSparkTemplate: AppCardTemplate = {
     email: 'leo@studiomax.design',
     website: 'studiomax.design',
     linkedin: 'linkedin.com/in/leomaxwelldesign',
-    twitter: '@leomaxdesign',
-    github: 'github.com/leomax',
+    // twitter: '@leomaxdesign', // Removed
+    // github: 'github.com/leomax', // Removed
     address: 'The Art Factory, Brooklyn, NY',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`, 
@@ -464,8 +464,8 @@ export const solidFoundationTemplate: AppCardTemplate = {
     email: 'mike@hammerstone.build',
     website: 'hammerstone.build',
     linkedin: 'linkedin.com/company/hammerstonebuilders',
-    twitter: '',
-    github: '',
+    // twitter: '', // Removed
+    // github: '', // Removed
     address: '456 Builder Rd, Concreton, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`,
@@ -504,8 +504,8 @@ export const dreamWeaverTemplate: AppCardTemplate = {
     email: 'sarah.keys@homestead.com',
     website: 'sarahkeyshomes.com',
     linkedin: 'linkedin.com/in/sarahkeysrealtor',
-    twitter: '@sarahkeyshomes',
-    github: '',
+    // twitter: '@sarahkeyshomes', // Removed
+    // github: '', // Removed
     address: '789 Realty Ave, Suburbia, FL',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`, 
@@ -544,8 +544,8 @@ export const welcomeHostTemplate: AppCardTemplate = {
     email: 'd.lee@grandresort.com',
     website: 'grandresort.com',
     linkedin: 'linkedin.com/in/davidleehospitality',
-    twitter: '',
-    github: '',
+    // twitter: '', // Removed
+    // github: '', // Removed
     address: '1 Paradise Ln, Resort City, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`,
@@ -584,8 +584,8 @@ export const knowledgeBuilderTemplate: AppCardTemplate = {
     email: 'asharma@university.edu',
     website: 'university.edu/asharma',
     linkedin: 'linkedin.com/in/dranyasharma',
-    twitter: '@dranyasharma',
-    github: '',
+    // twitter: '@dranyasharma', // Removed
+    // github: '', // Removed
     address: 'Dept. of Physics, 1 Scholar Way, Academia, MA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`, 
@@ -624,8 +624,8 @@ export const financialAdvisorTemplate: AppCardTemplate = {
     email: 'mark.sterling@sterlingwealth.com',
     website: 'sterlingwealth.com',
     linkedin: 'linkedin.com/in/marksterlingcfp',
-    twitter: '',
-    github: '',
+    // twitter: '', // Removed
+    // github: '', // Removed
     address: 'Suite 101, Finance Plaza, Wall Street, NY',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`,
@@ -664,8 +664,8 @@ export const wellnessGuruTemplate: AppCardTemplate = {
     email: 'chandra@sereneliving.com',
     website: 'sereneliving.com',
     linkedin: 'linkedin.com/in/chandradeviwellness',
-    twitter: '@serenechandra',
-    github: '',
+    // twitter: '@serenechandra', // Removed
+    // github: '', // Removed
     address: 'The Zen Den, 1 Peaceful Path, Harmony, CA',
     profilePictureUrl: `https://placehold.co/120x120.png`,
     cardBackgroundUrl: `https://placehold.co/600x900.png`, 

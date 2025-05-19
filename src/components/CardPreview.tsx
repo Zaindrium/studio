@@ -4,7 +4,7 @@
 import React from 'react';
 import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
 import NextImage from 'next/image';
-import { Phone, Mail, Globe, Linkedin, Twitter, Github, MapPin, UserCircle2, Briefcase, Download, Building } from 'lucide-react';
+import { Phone, Mail, Globe, Linkedin, MapPin, UserCircle2, Building, Download } from 'lucide-react'; // Removed Twitter, Github
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -85,7 +85,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
           objectFit="cover" 
           objectPosition="center" 
           className="z-0" 
-          data-ai-hint={design.aiHint || "abstract background"} // Use AI hint from design settings
+          data-ai-hint={design.aiHint || "abstract background"}
           priority={isPublicView}
         />
       ) : null}
@@ -174,11 +174,11 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
             { key: 'phone', icon: Phone, value: profile.phone, hrefPrefix: 'tel:' },
             { key: 'website', icon: Globe, value: profile.website, hrefPrefix: '' },
             { key: 'linkedin', icon: Linkedin, value: profile.linkedin, hrefPrefix: '' },
-            { key: 'twitter', icon: Twitter, value: profile.twitter, hrefPrefix: profile.twitter?.startsWith('@') ? 'https://twitter.com/' : '' , transformValue: (val:string) => val.startsWith('@') ? val.substring(1) : val },
-            { key: 'github', icon: Github, value: profile.github, hrefPrefix: profile.github?.includes('/') ? '' : 'https://github.com/' },
+            // { key: 'twitter', icon: Twitter, value: profile.twitter, hrefPrefix: profile.twitter?.startsWith('@') ? 'https://twitter.com/' : '' , transformValue: (val:string) => val.startsWith('@') ? val.substring(1) : val }, // Removed
+            // { key: 'github', icon: Github, value: profile.github, hrefPrefix: profile.github?.includes('/') ? '' : 'https://github.com/' }, // Removed
             { key: 'address', icon: MapPin, value: profile.address },
           ].map((item) => {
-            if (item.value && item.value.trim() !== '') { // Only render if value exists and is not just whitespace
+            if (item.value && item.value.trim() !== '') { 
             const IconComponent = item.icon;
             const displayValue = item.transformValue ? item.transformValue(item.value) : item.value;
             const hrefValue = item.hrefPrefix !== undefined ? ensureHttps(item.hrefPrefix + displayValue) : undefined;
