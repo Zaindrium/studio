@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react'; // Added useEffect, useCallback
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,38 +45,21 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
-import { db } from '@/lib/firebase'; // Import db
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore'; // Import Firestore functions
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+import { useAuth } from '@/contexts/auth-context';
+import { db } from '@/lib/firebase';
+import { collection, query, getDocs, Timestamp, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import type { Role, RolePermission } from '@/lib/app-types';
+import { Skeleton } from '@/components/ui/skeleton';
 
-
-interface RolePermission {
-  id: string;
-  name: string;
-  description: string;
-}
-
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: RolePermission[]; 
-  // companyId might be implicit if roles are company-specific
-}
-
-// MOCK_PERMISSIONS_DATA and MOCK_ROLES_DATA removed
 
 const initialNewRoleState: Partial<Role> = {
     name: '',
     description: '',
-    permissions: [], // Permissions management would be more complex
+    permissions: [], 
 };
 
 export default function RolesPage() {
-  const { companyId, loading: authLoading } = useAuth();
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [isLoadingRoles, setIsLoadingRoles] = useState(true);
+  const { companyId, loading: authLoading, rolesListCache, fetchAndCacheRoles } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -85,54 +68,29 @@ export default function RolesPage() {
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [isDeleteRoleAlertOpen, setIsDeleteRoleAlertOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(true);
 
-  const fetchRoles = useCallback(async () => {
-    if (!companyId) {
-        if (!authLoading) { /* toast({ title: "Error", description: "Company ID missing. Cannot fetch roles.", variant: "destructive" }); */ }
-        setRoles([]);
-        setIsLoadingRoles(false);
-        return;
-    }
-    setIsLoadingRoles(true);
-    try {
-        // Assuming roles are stored under a 'roles' subcollection in each company
-        // Or a top-level 'roles' collection with a companyId field.
-        // For this example, let's assume they are NOT company-specific yet or we'd need to query by companyId.
-        // If roles are company-specific, path would be e.g., `companies/${companyId}/roles`
-        // For now, will use a general placeholder message if no roles.
-        
-        // Placeholder: In a real app, you'd fetch from Firestore:
-        // const rolesCollectionRef = collection(db, `companies/${companyId}/roles`); // Or a global roles collection
-        // const q = query(rolesCollectionRef);
-        // const querySnapshot = await getDocs(q);
-        // const fetchedRoles: Role[] = [];
-        // querySnapshot.forEach((docSnap) => { ... });
-        // setRoles(fetchedRoles);
-        setRoles([]); // Start with no roles if not fetching
-    } catch (error) {
-        console.error("Error fetching roles:", error);
-        toast({ title: "Error", description: "Could not fetch roles list.", variant: "destructive" });
-    } finally {
-        setIsLoadingRoles(false);
-    }
-  }, [companyId, toast, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && companyId) { // Also check for companyId
-        fetchRoles();
+    if (!authLoading && companyId) {
+        if (!rolesListCache) {
+            fetchAndCacheRoles(companyId).finally(() => setIsLoadingRoles(false));
+        } else {
+            setIsLoadingRoles(false);
+        }
     } else if (!authLoading && !companyId) {
-        setRoles([]);
         setIsLoadingRoles(false);
     }
-  }, [fetchRoles, authLoading, companyId]);
-
+  }, [authLoading, companyId, rolesListCache, fetchAndCacheRoles]);
 
   const filteredRoles = useMemo(() => {
-    return roles.filter(role =>
+    if (!rolesListCache) return [];
+    return rolesListCache.filter(role =>
       role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       role.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [roles, searchTerm]);
+  }, [rolesListCache, searchTerm]);
 
   const handleOpenModifyRoleDialog = (roleToEdit: Role | null = null) => {
     if (roleToEdit) {
@@ -153,11 +111,47 @@ export default function RolesPage() {
     setNewRoleForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveRole = (event: React.FormEvent) => {
+  const handleSaveRole = async (event: React.FormEvent) => {
     event.preventDefault();
-     // TODO: Implement Firestore save/update logic for roles
-    toast({ title: "Action Incomplete", description: "Saving/updating roles to Firestore not yet implemented.", variant: "default" });
-    setIsModifyRoleDialogOpen(false);
+    if (!newRoleForm.name?.trim() || !newRoleForm.description?.trim()) {
+        toast({ title: "Missing Information", description: "Role Name and Description are required.", variant: "destructive" });
+        return;
+    }
+    if (!companyId) {
+        toast({ title: "Error", description: "Company context not available.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+
+    const roleDataToSave: Omit<Role, 'id' | 'createdAt' | 'updatedAt'> = {
+        name: newRoleForm.name,
+        description: newRoleForm.description,
+        permissions: newRoleForm.permissions || [], // Default to empty array
+        companyId: companyId,
+    };
+
+    try {
+        if (editingRole) {
+            const roleDocRef = doc(db, `companies/${companyId}/roles`, editingRole.id);
+            await updateDoc(roleDocRef, { ...roleDataToSave, updatedAt: serverTimestamp() });
+            toast({ title: "Role Updated", description: `Role "${newRoleForm.name}" has been updated.` });
+        } else {
+            const rolesCollectionRef = collection(db, `companies/${companyId}/roles`);
+            await addDoc(rolesCollectionRef, { ...roleDataToSave, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            toast({ title: "Role Created", description: `Role "${newRoleForm.name}" has been created.` });
+        }
+        setIsModifyRoleDialogOpen(false);
+        await fetchAndCacheRoles(companyId);
+    } catch (error: any) {
+        console.error("Error saving role:", error);
+        if (error.code === 'permission-denied') {
+            toast({ title: "Permission Denied", description: "You do not have permission to save roles. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        } else {
+            toast({ title: "Error Saving Role", description: `Could not save role: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        }
+    } finally {
+        setIsSubmitting(false);
+    }
   };
   
   const confirmDeleteRole = (role: Role) => {
@@ -165,12 +159,26 @@ export default function RolesPage() {
     setIsDeleteRoleAlertOpen(true);
   };
 
-  const handleDeleteRole = () => {
-    if (!roleToDelete) return;
-    // TODO: Implement Firestore delete logic for roles
-    toast({ title: "Action Incomplete", description: `Deleting role "${roleToDelete.name}" from Firestore not yet implemented.`, variant: "default" });
-    setIsDeleteRoleAlertOpen(false);
-    setRoleToDelete(null);
+  const handleDeleteRole = async () => {
+    if (!roleToDelete || !companyId) return;
+    setIsSubmitting(true);
+    try {
+        const roleDocRef = doc(db, `companies/${companyId}/roles`, roleToDelete.id);
+        await deleteDoc(roleDocRef);
+        toast({ title: "Role Deleted", description: `Role "${roleToDelete.name}" has been removed.` });
+        await fetchAndCacheRoles(companyId);
+    } catch (error: any) {
+        console.error("Error deleting role:", error);
+        if (error.code === 'permission-denied') {
+            toast({ title: "Permission Denied", description: "You do not have permission to delete roles. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        } else {
+            toast({ title: "Error Deleting Role", description: `Could not delete role: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        }
+    } finally {
+        setIsDeleteRoleAlertOpen(false);
+        setRoleToDelete(null);
+        setIsSubmitting(false);
+    }
   };
 
   if (authLoading || isLoadingRoles) {
@@ -240,14 +248,14 @@ export default function RolesPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" disabled={isSubmitting}>
                           <MoreVertical className="h-4 w-4" />
                            <span className="sr-only">Role Actions for {role.name}</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions for {role.name}</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenModifyRoleDialog(role)}>
+                        <DropdownMenuItem onClick={() => handleOpenModifyRoleDialog(role)} disabled={isSubmitting}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Role Details
                         </DropdownMenuItem>
@@ -258,10 +266,8 @@ export default function RolesPage() {
                          <DropdownMenuSeparator />
                         <DropdownMenuItem 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onSelect={(e) => {
-                                e.preventDefault();
-                                confirmDeleteRole(role);
-                            }}
+                            onSelect={(e) => { e.preventDefault(); confirmDeleteRole(role); }}
+                            disabled={isSubmitting}
                         >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete Role
@@ -281,9 +287,9 @@ export default function RolesPage() {
           </Table>
         </div>
       </CardContent>
-      {filteredRoles.length > 0 && (
+      {rolesListCache && filteredRoles.length > 0 && (
         <CardFooter className="justify-center border-t pt-4">
-          <p className="text-xs text-muted-foreground">Showing {filteredRoles.length} of {roles.length} roles.</p>
+          <p className="text-xs text-muted-foreground">Showing {filteredRoles.length} of {rolesListCache.length} roles.</p>
         </CardFooter>
       )}
 
@@ -322,9 +328,11 @@ export default function RolesPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
+                <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={!companyId}>{editingRole ? 'Save Changes (Simulated)' : 'Create Role (Simulated)'}</Button>
+              <Button type="submit" disabled={!companyId || isSubmitting}>
+                {isSubmitting ? 'Saving...' : (editingRole ? 'Save Changes' : 'Create Role')}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -336,13 +344,13 @@ export default function RolesPage() {
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete the role "{roleToDelete?.name}".
-                Users assigned this role might lose specific access. (Action is simulated)
+                Users assigned this role might lose specific access.
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setRoleToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteRole}>
-                Yes, delete role (Simulated)
+            <AlertDialogCancel onClick={() => setRoleToDelete(null)} disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteRole} disabled={isSubmitting}>
+                {isSubmitting ? 'Deleting...' : 'Yes, delete role'}
             </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

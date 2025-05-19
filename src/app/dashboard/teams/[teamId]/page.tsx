@@ -27,39 +27,35 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input'; // Keep this for potential future use
-import { Label } from '@/components/ui/label'; // Keep this for potential future use
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import type { TeamMember, AssignedTemplate, TeamMetrics, DetailedTeam, StaffRecord, OrganizationUser } from '@/lib/app-types'; // Make sure OrganizationUser is exported
+import type { TeamMember, AssignedTemplate, TeamMetrics, DetailedTeam, StaffRecord } from '@/lib/app-types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, deleteDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, deleteDoc, Timestamp, increment } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
-
-// MOCK_ORGANIZATION_USERS will be replaced by fetching
-// MOCK_DETAILED_TEAMS_DATA will be replaced by fetching
 
 export default function TeamDetailPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = params.teamId as string;
   const { toast } = useToast();
-  const { companyId, loading: authLoading } = useAuth();
+  const { companyId, loading: authLoading, fetchAndCacheTeams, staffListCache, fetchAndCacheStaff } = useAuth();
 
   const [currentTeam, setCurrentTeam] = useState<DetailedTeam | null>(null);
   const [isLoadingTeam, setIsLoadingTeam] = useState(true);
   const [isManageMembersDialogOpen, setIsManageMembersDialogOpen] = useState(false);
-  const [organizationStaff, setOrganizationStaff] = useState<StaffRecord[]>([]);
-  const [isLoadingOrgStaff, setIsLoadingOrgStaff] = useState(false);
+  const [isLoadingOrgStaff, setIsLoadingOrgStaff] = useState(true);
+  const [isDeletingTeam, setIsDeletingTeam] = useState(false);
+  const [isDeleteTeamAlertOpen, setIsDeleteTeamAlertOpen] = useState(false);
   
   const calculateTeamMetrics = (team: DetailedTeam | null): TeamMetrics => {
     if (!team || !team.members || team.members.length === 0) {
       return {
         cardsCreated: 0,
         averageSharesPerCard: 0,
-        leadsGenerated: team?.teamMetrics?.leadsGenerated || 0, // Use existing if available
+        leadsGenerated: team?.teamMetrics?.leadsGenerated || 0,
         activeMembers: 0,
       };
     }
@@ -70,16 +66,18 @@ export default function TeamDetailPage() {
     return {
       cardsCreated: totalCardsCreated,
       averageSharesPerCard: parseFloat(overallAverageShares.toFixed(1)),
-      leadsGenerated: team.teamMetrics?.leadsGenerated || 0, // Use existing
+      leadsGenerated: team.teamMetrics?.leadsGenerated || 0,
       activeMembers: team.members.length,
     };
   };
 
   const fetchTeamDetails = useCallback(async () => {
     if (!companyId || !teamId) {
-        if(!authLoading) toast({ title: "Error", description: "Company or Team ID missing.", variant: "destructive" });
-        setIsLoadingTeam(false);
-        return;
+      if (!authLoading) {
+        // toast({ title: "Error", description: "Company or Team ID missing.", variant: "destructive" });
+      }
+      setIsLoadingTeam(false);
+      return;
     }
     setIsLoadingTeam(true);
     try {
@@ -89,7 +87,6 @@ export default function TeamDetailPage() {
       if (teamDocSnap.exists()) {
         const teamData = teamDocSnap.data() as Omit<DetailedTeam, 'id' | 'members' | 'teamMetrics'>;
         
-        // Fetch members - assuming memberUserIds stores staff IDs
         let members: TeamMember[] = [];
         if (teamData.memberUserIds && teamData.memberUserIds.length > 0) {
           const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
@@ -101,10 +98,10 @@ export default function TeamDetailPage() {
             return {
               id: docSnap.id,
               name: staffData.name,
-              role: staffData.role, // Or a team-specific role if you have that
+              role: staffData.role,
               email: staffData.email,
               cardsCreatedCount: staffData.cardsCreatedCount || 0,
-              averageSharesPerCard: 0, // This would need more complex aggregation
+              averageSharesPerCard: 0, 
             };
           });
         }
@@ -113,9 +110,8 @@ export default function TeamDetailPage() {
           id: teamDocSnap.id,
           ...teamData,
           members,
-          // assignedTemplates and teamMetrics might be subcollections or fetched differently
-          assignedTemplates: teamData.assignedTemplates || [], // Keep mock or fetch
-          teamMetrics: { leadsGenerated: 0, ...teamData.teamMetrics }, // Initialize with default if not present
+          assignedTemplates: teamData.assignedTemplates || [],
+          teamMetrics: { leadsGenerated: 0, ...teamData.teamMetrics },
         };
         fullTeamData.teamMetrics = calculateTeamMetrics(fullTeamData);
         setCurrentTeam(fullTeamData);
@@ -125,43 +121,36 @@ export default function TeamDetailPage() {
         setCurrentTeam(null);
         router.push('/dashboard/teams');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching team details:", error);
-      toast({ title: "Error", description: "Could not fetch team details.", variant: "destructive" });
+      if (error.code === 'permission-denied') {
+        toast({ title: "Permission Denied", description: "You do not have permission to view this team. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+      } else {
+        toast({ title: "Error Fetching Team", description: `Could not fetch team details: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      }
     } finally {
       setIsLoadingTeam(false);
     }
   }, [companyId, teamId, toast, router, authLoading]);
 
-  const fetchOrganizationStaff = useCallback(async () => {
-    if (!companyId) return;
-    setIsLoadingOrgStaff(true);
-    try {
-      const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
-      const q = query(staffCollectionRef);
-      const querySnapshot = await getDocs(q);
-      const fetchedStaff: StaffRecord[] = [];
-      querySnapshot.forEach((docSnap) => {
-        fetchedStaff.push({ id: docSnap.id, ...docSnap.data() } as StaffRecord);
-      });
-      setOrganizationStaff(fetchedStaff);
-    } catch (error) {
-      console.error("Error fetching organization staff:", error);
-    } finally {
-      setIsLoadingOrgStaff(false);
-    }
-  }, [companyId]);
-
   useEffect(() => {
     if (!authLoading && companyId) {
       fetchTeamDetails();
-      fetchOrganizationStaff();
+      if (!staffListCache) {
+        fetchAndCacheStaff(companyId).finally(() => setIsLoadingOrgStaff(false));
+      } else {
+        setIsLoadingOrgStaff(false);
+      }
+    } else if (!authLoading && !companyId) {
+        setIsLoadingTeam(false);
+        setIsLoadingOrgStaff(false);
     }
-  }, [authLoading, companyId, fetchTeamDetails, fetchOrganizationStaff]);
+  }, [authLoading, companyId, fetchTeamDetails, staffListCache, fetchAndCacheStaff]);
 
 
   const handleDeleteTeam = async () => {
     if (!currentTeam || !companyId) return;
+    setIsDeletingTeam(true);
     try {
       const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
       await deleteDoc(teamDocRef);
@@ -170,10 +159,18 @@ export default function TeamDetailPage() {
         description: `Team "${currentTeam.name}" has been deleted.`,
         variant: "default",
       });
+      await fetchAndCacheTeams(companyId); // Refresh team list in context
       router.push('/dashboard/teams');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting team:", error);
-      toast({ title: "Error", description: "Could not delete team.", variant: "destructive" });
+      if (error.code === 'permission-denied') {
+         toast({ title: "Permission Denied", description: "You do not have permission to delete this team. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+      } else {
+        toast({ title: "Error Deleting Team", description: `Could not delete team: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      }
+    } finally {
+        setIsDeletingTeam(false);
+        setIsDeleteTeamAlertOpen(false);
     }
   };
 
@@ -183,45 +180,55 @@ export default function TeamDetailPage() {
     try {
       const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
       await updateDoc(teamDocRef, {
-        memberUserIds: arrayRemove(memberId)
+        memberUserIds: arrayRemove(memberId),
+        memberCount: increment(-1) // Decrement member count
       });
-      // Re-fetch team details to update member list and metrics
-      fetchTeamDetails(); 
+      await fetchTeamDetails(); // Re-fetch team details to update member list and metrics
+      await fetchAndCacheTeams(companyId); // Refresh global teams cache
       toast({
         title: "Member Removed",
         description: `${memberToRemove?.name || 'Member'} has been removed from the team.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing member:", error);
-      toast({ title: "Error", description: "Could not remove member.", variant: "destructive" });
+      if (error.code === 'permission-denied') {
+        toast({ title: "Permission Denied", description: "You do not have permission to remove members. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+      } else {
+        toast({ title: "Error Removing Member", description: `Could not remove member: ${error.message || 'Unknown error'}`, variant: "destructive" });
+      }
     }
   };
 
   const handleAddMember = async (staffId: string) => {
-    if (!currentTeam || !companyId) return;
-    const staffToAdd = organizationStaff.find(u => u.id === staffId);
+    if (!currentTeam || !companyId || !staffListCache) return;
+    const staffToAdd = staffListCache.find(u => u.id === staffId);
     if (staffToAdd && !currentTeam.members.find(m => m.id === staffId)) {
       try {
         const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
         await updateDoc(teamDocRef, {
-          memberUserIds: arrayUnion(staffId)
+          memberUserIds: arrayUnion(staffId),
+          memberCount: increment(1) // Increment member count
         });
-         // Re-fetch team details to update member list and metrics
-        fetchTeamDetails();
+        await fetchTeamDetails(); // Re-fetch team details
+        await fetchAndCacheTeams(companyId); // Refresh global teams cache
         toast({
           title: "Member Added",
           description: `${staffToAdd.name} has been added to the team.`,
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error adding member:", error);
-        toast({ title: "Error", description: "Could not add member.", variant: "destructive" });
+        if (error.code === 'permission-denied') {
+          toast({ title: "Permission Denied", description: "You do not have permission to add members. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        } else {
+          toast({ title: "Error Adding Member", description: `Could not add member: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        }
       }
     }
   };
   
-  const availableUsersToAdd = organizationStaff.filter(
+  const availableUsersToAdd = staffListCache ? staffListCache.filter(
     orgUser => !currentTeam?.members.find(teamMember => teamMember.id === orgUser.id)
-  );
+  ) : [];
 
   if (authLoading || isLoadingTeam) {
     return (
@@ -247,7 +254,7 @@ export default function TeamDetailPage() {
         <h1 className="text-2xl font-semibold">Team Not Found</h1>
         <p className="text-muted-foreground">This team does not exist or you may not have permission to view it.</p>
         <Button asChild variant="link" className="mt-4">
-          <Link href="/dashboard/teams">Go Back to Teams</Link>
+          <Link href="/dashboard/teams">Go Back to All Teams</Link>
         </Button>
       </div>
     );
@@ -264,7 +271,7 @@ export default function TeamDetailPage() {
             </Link>
           </Button>
           <h1 className="text-3xl font-bold">{currentTeam.name}</h1>
-          <p className="text-muted-foreground">{currentTeam.description}</p>
+          <p className="text-muted-foreground">{currentTeam.description || 'No description provided.'}</p>
           <p className="text-sm text-muted-foreground mt-1">Managed by: {currentTeam.managerName || 'N/A'}</p>
         </div>
         <Button variant="outline" disabled> {/* TODO: Implement Edit Team Dialog */}
@@ -332,14 +339,14 @@ export default function TeamDetailPage() {
       </div>
 
       <Dialog open={isManageMembersDialogOpen} onOpenChange={setIsManageMembersDialogOpen}>
-        <DialogContent className="sm:max-w-2xl"> 
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col"> 
           <DialogHeader>
             <DialogTitle>Manage Team Members for "{currentTeam.name}"</DialogTitle>
             <DialogDescription>
               Add new members from your organization or remove existing ones from this team.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[60vh] overflow-y-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 overflow-y-auto">
             <div className="space-y-3">
               <h3 className="text-lg font-medium text-foreground">Current Members ({currentTeam.members.length})</h3>
               <ScrollArea className="h-[45vh] rounded-md border p-3">
@@ -422,7 +429,7 @@ export default function TeamDetailPage() {
             </div>
             <div>
                 <h4 className="font-medium mb-1">Description</h4>
-                <p className="text-sm text-muted-foreground p-2 border rounded bg-secondary/20 min-h-[60px]">{currentTeam.description}</p>
+                <p className="text-sm text-muted-foreground p-2 border rounded bg-secondary/20 min-h-[60px]">{currentTeam.description || 'No description provided.'}</p>
             </div>
             <div>
                 <h4 className="font-medium mb-1">Team Manager</h4>
@@ -431,10 +438,10 @@ export default function TeamDetailPage() {
              <Button variant="outline" className="w-full" disabled> {/* TODO: Implement Edit Team Dialog */}
               <Edit className="mr-2 h-4 w-4" /> Modify Name, Description, or Manager
             </Button>
-            <AlertDialog>
+            <AlertDialog open={isDeleteTeamAlertOpen} onOpenChange={setIsDeleteTeamAlertOpen}>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full">
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete Team
+                <Button variant="destructive" className="w-full" onClick={() => setIsDeleteTeamAlertOpen(true)} disabled={isDeletingTeam}>
+                  {isDeletingTeam ? 'Deleting...' : <><Trash2 className="mr-2 h-4 w-4" /> Delete Team</>}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -447,9 +454,9 @@ export default function TeamDetailPage() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteTeam}>
-                    Continue
+                  <AlertDialogCancel onClick={() => setIsDeleteTeamAlertOpen(false)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteTeam} disabled={isDeletingTeam}>
+                    {isDeletingTeam ? 'Deleting...' : 'Yes, delete team'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

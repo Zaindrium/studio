@@ -29,7 +29,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore'; // Removed addDoc, updateDoc, deleteDoc for now
+import { collection, query, getDocs, Timestamp, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 
 // Dynamically import Dialog and AlertDialog
@@ -51,8 +51,6 @@ const LazyAlertDialogCancel = lazy(() => import("@/components/ui/alert-dialog").
 const LazyAlertDialogAction = lazy(() => import("@/components/ui/alert-dialog").then(m => ({ default: m.AlertDialogAction })));
 
 
-// MOCK_ADMINS_DATA removed
-
 const initialNewAdminState: Partial<AdminUser> = {
     name: '',
     email: '',
@@ -61,9 +59,7 @@ const initialNewAdminState: Partial<AdminUser> = {
 };
 
 export default function AdministratorsPage() {
-  const { companyId, loading: authLoading } = useAuth();
-  const [administrators, setAdministrators] = useState<AdminUser[]>([]);
-  const [isLoadingAdmins, setIsLoadingAdmins] = useState(true);
+  const { companyId, loading: authLoading, adminListCache, fetchAndCacheAdmins } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
@@ -72,63 +68,38 @@ export default function AdministratorsPage() {
   const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   const [isDeleteAdminAlertOpen, setIsDeleteAdminAlertOpen] = useState(false);
   const [adminToDelete, setAdminToDelete] = useState<AdminUser | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(true);
 
-  const fetchAdmins = useCallback(async () => {
-    if (!companyId) {
-        if (!authLoading) { /* toast({ title: "Error", description: "Company ID missing. Cannot fetch admins.", variant: "destructive" }); */ }
-        setAdministrators([]);
-        setIsLoadingAdmins(false);
-        return;
-    }
-    setIsLoadingAdmins(true);
-    try {
-        const adminsCollectionRef = collection(db, `companies/${companyId}/admins`);
-        const q = query(adminsCollectionRef);
-        const querySnapshot = await getDocs(q);
-        const fetchedAdmins: AdminUser[] = [];
-        querySnapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            fetchedAdmins.push({
-                id: docSnap.id,
-                ...data,
-                createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
-                updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
-                lastLoginAt: data.lastLoginAt instanceof Timestamp ? data.lastLoginAt.toDate().toLocaleString() : data.lastLoginAt || '-',
-            } as AdminUser);
-        });
-        setAdministrators(fetchedAdmins);
-    } catch (error) {
-        console.error("Error fetching administrators:", error);
-        toast({ title: "Error", description: "Could not fetch administrators list.", variant: "destructive" });
-    } finally {
-        setIsLoadingAdmins(false);
-    }
-  }, [companyId, toast, authLoading]);
 
   useEffect(() => {
     if (!authLoading && companyId) {
-        fetchAdmins();
+        if (!adminListCache) {
+            fetchAndCacheAdmins(companyId).finally(() => setIsLoadingAdmins(false));
+        } else {
+            setIsLoadingAdmins(false);
+        }
     } else if (!authLoading && !companyId) {
-        setAdministrators([]);
         setIsLoadingAdmins(false);
     }
-  }, [fetchAdmins, authLoading, companyId]);
+  }, [authLoading, companyId, adminListCache, fetchAndCacheAdmins]);
 
 
   const filteredAdmins = useMemo(() => {
-    return administrators.filter(admin =>
+    if (!adminListCache) return [];
+    return adminListCache.filter(admin =>
       admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       admin.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [administrators, searchTerm]);
+  }, [adminListCache, searchTerm]);
 
   const handleOpenInviteAdminDialog = (adminToEdit: AdminUser | null = null) => {
     if (adminToEdit) {
       setEditingAdmin(adminToEdit);
       setNewAdminForm({
         name: adminToEdit.name,
-        email: adminToEdit.email,
-        role: 'Admin', 
+        email: adminToEdit.email, // Email not editable in this form
+        role: adminToEdit.role, 
         status: adminToEdit.status, 
       });
     } else {
@@ -142,11 +113,56 @@ export default function AdministratorsPage() {
     setNewAdminForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveAdmin = (event: React.FormEvent) => {
+  const handleSaveAdmin = async (event: React.FormEvent) => {
     event.preventDefault();
-    // TODO: Implement Firestore save/update logic for admins
-    toast({ title: "Action Incomplete", description: "Saving/updating admins to Firestore not yet implemented.", variant: "default" });
-    setIsInviteAdminDialogOpen(false);
+    if (!newAdminForm.name?.trim() || !newAdminForm.email?.trim()) {
+        toast({ title: "Missing Information", description: "Name and Email are required.", variant: "destructive" });
+        return;
+    }
+    if (!companyId) {
+        toast({ title: "Error", description: "Company context not available.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+
+    const adminDataToSave: Partial<AdminUser> = {
+        name: newAdminForm.name,
+        email: newAdminForm.email,
+        role: newAdminForm.role || 'Admin',
+        status: editingAdmin ? newAdminForm.status : 'Invited',
+        companyId: companyId, // Ensure companyId is part of the data
+    };
+
+    try {
+        if (editingAdmin) {
+            const adminDocRef = doc(db, `companies/${companyId}/admins`, editingAdmin.id);
+            await updateDoc(adminDocRef, { ...adminDataToSave, updatedAt: serverTimestamp() });
+            toast({ title: "Administrator Updated", description: `${newAdminForm.name} has been updated.` });
+        } else {
+            // For new admins, we typically don't create Firebase Auth users here, just the record.
+            // Firebase Auth user creation would happen via a separate invitation flow ideally.
+            const adminsCollectionRef = collection(db, `companies/${companyId}/admins`);
+            await addDoc(adminsCollectionRef, { 
+                ...adminDataToSave, 
+                companyName: (await getDoc(doc(db, "companies", companyId))).data()?.name || 'Unknown Company',
+                emailVerified: false, // Assume not verified until they accept invite (if applicable)
+                createdAt: serverTimestamp(), 
+                updatedAt: serverTimestamp() 
+            });
+            toast({ title: "Administrator Invited", description: `${newAdminForm.name} has been invited.` });
+        }
+        setIsInviteAdminDialogOpen(false);
+        await fetchAndCacheAdmins(companyId);
+    } catch (error: any) {
+        console.error("Error saving admin:", error);
+        if (error.code === 'permission-denied') {
+            toast({ title: "Permission Denied", description: "You do not have permission to save admin details. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        } else {
+            toast({ title: "Error Saving Administrator", description: `Could not save admin details: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        }
+    } finally {
+        setIsSubmitting(false);
+    }
   };
   
   const confirmDeleteAdmin = (admin: AdminUser) => {
@@ -154,36 +170,57 @@ export default function AdministratorsPage() {
     setIsDeleteAdminAlertOpen(true);
   };
 
-  const handleDeleteAdmin = () => {
-    if (!adminToDelete) return;
-    // TODO: Implement Firestore delete logic for admins
-    toast({ title: "Action Incomplete", description: `Deleting admin "${adminToDelete.name}" from Firestore not yet implemented.`, variant: "default" });
-    setIsDeleteAdminAlertOpen(false);
-    setAdminToDelete(null);
+  const handleDeleteAdmin = async () => {
+    if (!adminToDelete || !companyId) return;
+    setIsSubmitting(true);
+    try {
+        const adminDocRef = doc(db, `companies/${companyId}/admins`, adminToDelete.id);
+        await deleteDoc(adminDocRef);
+        toast({ title: "Administrator Deleted", description: `Administrator "${adminToDelete.name}" has been removed.` });
+        await fetchAndCacheAdmins(companyId);
+    } catch (error: any) {
+        console.error("Error deleting admin:", error);
+        if (error.code === 'permission-denied') {
+            toast({ title: "Permission Denied", description: "You do not have permission to delete administrators. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        } else {
+            toast({ title: "Error Deleting Administrator", description: `Could not remove administrator: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        }
+    } finally {
+        setIsDeleteAdminAlertOpen(false);
+        setAdminToDelete(null);
+        setIsSubmitting(false);
+    }
   };
 
-  const handleToggleAdminStatus = (adminId: string) => {
-    // TODO: Implement Firestore status update logic
-    setAdministrators(prevAdmins => 
-      prevAdmins.map(admin => {
-        if (admin.id === adminId) {
-          const newStatus = admin.status === 'Active' ? 'Inactive' : 'Active';
-          toast({
-            title: `Status Change (Simulated) for ${admin.name}`,
-            description: `${admin.name} is now ${newStatus}. Backend update needed.`
-          });
-          return { ...admin, status: newStatus };
+  const handleToggleAdminStatus = async (admin: AdminUser) => {
+    if (!companyId) return;
+    const newStatus = admin.status === 'Active' ? 'Inactive' : 'Active';
+    setIsSubmitting(true);
+    try {
+        const adminDocRef = doc(db, `companies/${companyId}/admins`, admin.id);
+        await updateDoc(adminDocRef, { status: newStatus, updatedAt: serverTimestamp() });
+        toast({
+          title: `Status Updated for ${admin.name}`,
+          description: `${admin.name} is now ${newStatus}.`
+        });
+        await fetchAndCacheAdmins(companyId);
+    } catch (error: any) {
+        console.error("Error toggling admin status:", error);
+        if (error.code === 'permission-denied') {
+            toast({ title: "Permission Denied", description: "You do not have permission to change admin status. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        } else {
+            toast({ title: "Error Updating Status", description: `Could not update status: ${error.message || 'Unknown error'}`, variant: "destructive" });
         }
-        return admin;
-      })
-    );
+    } finally {
+        setIsSubmitting(false);
+    }
   };
   
   const handleResendInvite = (adminEmail: string, adminName: string) => {
-    // TODO: Implement actual email sending logic
+    // TODO: Implement actual email sending logic (e.g., via a Cloud Function)
     toast({
       title: "Invitation Resent (Simulated)",
-      description: `An invitation email would be resent to ${adminName} at ${adminEmail}. Backend update needed.`
+      description: `An invitation email would be resent to ${adminName} at ${adminEmail}.`
     });
   };
 
@@ -264,27 +301,25 @@ export default function AdministratorsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions for {admin.name}</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenInviteAdminDialog(admin)}>
+                        <DropdownMenuItem onClick={() => handleOpenInviteAdminDialog(admin)} disabled={isSubmitting}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Details
                         </DropdownMenuItem>
                         {admin.status === 'Invited' && (
-                            <DropdownMenuItem onClick={() => handleResendInvite(admin.email, admin.name)}>
+                            <DropdownMenuItem onClick={() => handleResendInvite(admin.email, admin.name)} disabled={isSubmitting}>
                                 <Send className="mr-2 h-4 w-4" />
                                 Resend Invitation
                             </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => handleToggleAdminStatus(admin.id)}>
+                        <DropdownMenuItem onClick={() => handleToggleAdminStatus(admin)} disabled={isSubmitting}>
                           {admin.status === 'Active' ? <ShieldAlert className="mr-2 h-4 w-4 text-amber-500" /> : <ShieldCheck className="mr-2 h-4 w-4 text-green-500" />}
                           {admin.status === 'Active' ? 'Deactivate' : 'Activate'}
                         </DropdownMenuItem>
                          <DropdownMenuSeparator />
                         <DropdownMenuItem 
                             className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                            onSelect={(e) => {
-                                e.preventDefault();
-                                confirmDeleteAdmin(admin);
-                            }}
+                            onSelect={(e) => { e.preventDefault(); confirmDeleteAdmin(admin); }}
+                            disabled={isSubmitting}
                         >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete Administrator
@@ -304,9 +339,9 @@ export default function AdministratorsPage() {
           </Table>
         </div>
       </CardContent>
-      {filteredAdmins.length > 0 && (
+      {adminListCache && filteredAdmins.length > 0 && (
         <CardFooter className="justify-center border-t pt-4">
-          <p className="text-xs text-muted-foreground">Showing {filteredAdmins.length} of {administrators.length} administrators.</p>
+          <p className="text-xs text-muted-foreground">Showing {filteredAdmins.length} of {adminListCache.length} administrators.</p>
         </CardFooter>
       )}
 
@@ -341,16 +376,18 @@ export default function AdministratorsPage() {
                       onChange={(e) => handleFormChange('email', e.target.value)}
                       placeholder="e.g., alex.admin@example.com"
                       required
-                      disabled={!!editingAdmin} // Email usually not editable after creation
+                      disabled={!!editingAdmin} 
                     />
                      {editingAdmin && <p className="text-xs text-muted-foreground">Email address cannot be changed after creation.</p>}
                   </div>
                 </div>
                 <LazyDialogFooter>
                   <LazyDialogClose asChild>
-                    <Button type="button" variant="outline">Cancel</Button>
+                    <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
                   </LazyDialogClose>
-                  <Button type="submit">{editingAdmin ? 'Save Changes (Simulated)' : 'Send Invitation (Simulated)'}</Button>
+                  <Button type="submit" disabled={isSubmitting || !companyId}>
+                    {isSubmitting ? 'Saving...' : (editingAdmin ? 'Save Changes' : 'Send Invitation')}
+                  </Button>
                 </LazyDialogFooter>
               </form>
             </LazyDialogContent>
@@ -366,13 +403,13 @@ export default function AdministratorsPage() {
                 <LazyAlertDialogTitle>Are you absolutely sure?</LazyAlertDialogTitle>
                 <LazyAlertDialogDescription>
                     This action cannot be undone. This will permanently delete the administrator account for "{adminToDelete?.name}".
-                    They will lose all administrative privileges. (Action is simulated)
+                    They will lose all administrative privileges.
                 </LazyAlertDialogDescription>
               </LazyAlertDialogHeader>
               <LazyAlertDialogFooter>
-                <LazyAlertDialogCancel onClick={() => setAdminToDelete(null)}>Cancel</LazyAlertDialogCancel>
-                <LazyAlertDialogAction onClick={handleDeleteAdmin}>
-                    Yes, delete administrator (Simulated)
+                <LazyAlertDialogCancel onClick={() => setAdminToDelete(null)} disabled={isSubmitting}>Cancel</LazyAlertDialogCancel>
+                <LazyAlertDialogAction onClick={handleDeleteAdmin} disabled={isSubmitting}>
+                    {isSubmitting ? 'Deleting...' : 'Yes, delete administrator'}
                 </LazyAlertDialogAction>
               </LazyAlertDialogFooter>
             </LazyAlertDialogContent>

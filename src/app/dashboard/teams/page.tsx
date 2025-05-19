@@ -18,6 +18,16 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,7 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Team, StaffRecord } from '@/lib/app-types';
 import { useAuth } from '@/contexts/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, getDocs, Timestamp, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore'; // Added addDoc, serverTimestamp, deleteDoc, doc
+import { collection, query, getDocs, Timestamp, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface NewTeamFormState {
@@ -40,98 +50,52 @@ interface NewTeamFormState {
 const initialNewTeamState: NewTeamFormState = {
     name: '',
     description: '',
-    managerId: 'no-manager', 
+    managerId: 'no-manager',
 };
 
 export default function TeamsPage() {
-  const { currentUser, companyId, loading: authLoading } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [teams, setTeams] = useState<Team[]>([]);
+  const { companyId, loading: authLoading, teamsListCache, fetchAndCacheTeams, staffListCache, fetchAndCacheStaff } = useAuth();
   const { toast } = useToast();
 
+  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateTeamDialogOpen, setIsCreateTeamDialogOpen] = useState(false);
   const [newTeamForm, setNewTeamForm] = useState<NewTeamFormState>(initialNewTeamState);
-  const [staffList, setStaffList] = useState<StaffRecord[]>([]);
-  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
-  const [isLoadingTeams, setIsLoadingTeams] = useState(true); // For fetching teams
-
-  const fetchStaff = useCallback(async () => {
-    if (!companyId) return;
-    setIsLoadingStaff(true);
-    try {
-      const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
-      const q = query(staffCollectionRef);
-      const querySnapshot = await getDocs(q);
-      const fetchedStaff: StaffRecord[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        fetchedStaff.push({ id: doc.id, ...data } as StaffRecord);
-      });
-      setStaffList(fetchedStaff);
-    } catch (error) {
-      console.error("Error fetching staff for manager selection:", error);
-      toast({ title: "Error", description: "Could not fetch staff list.", variant: "destructive" });
-    } finally {
-      setIsLoadingStaff(false);
-    }
-  }, [companyId, toast]);
-
-  const fetchTeams = useCallback(async () => {
-    if (!companyId) {
-      if (!authLoading) {
-        // toast({ title: "Error", description: "Company ID not available for teams.", variant: "destructive" });
-      }
-      setIsLoadingTeams(false);
-      setTeams([]);
-      return;
-    }
-    setIsLoadingTeams(true);
-    try {
-      const teamsCollectionRef = collection(db, `companies/${companyId}/teams`);
-      const q = query(teamsCollectionRef);
-      const querySnapshot = await getDocs(q);
-      const fetchedTeams: Team[] = [];
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        fetchedTeams.push({
-          id: docSnap.id,
-          ...data,
-          createdAt: (data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt || Date.now())).toISOString(),
-          updatedAt: (data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt || Date.now())).toISOString(),
-        } as Team);
-      });
-      setTeams(fetchedTeams);
-    } catch (error) {
-      console.error("Error fetching teams:", error);
-      toast({ title: "Error", description: "Could not fetch teams list.", variant: "destructive" });
-    } finally {
-      setIsLoadingTeams(false);
-    }
-  }, [companyId, toast, authLoading]);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(true);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null); // Store ID of team being deleted
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
 
   useEffect(() => {
     if (!authLoading && companyId) {
-        fetchStaff();
-        fetchTeams();
+        if (!teamsListCache) {
+            fetchAndCacheTeams(companyId).finally(() => setIsLoadingTeams(false));
+        } else {
+            setIsLoadingTeams(false);
+        }
+        if (!staffListCache) {
+            fetchAndCacheStaff(companyId).finally(() => setIsLoadingStaff(false));
+        } else {
+            setIsLoadingStaff(false);
+        }
     } else if (!authLoading && !companyId) {
-      setStaffList([]);
-      setTeams([]);
-      setIsLoadingStaff(false);
-      setIsLoadingTeams(false);
+        setIsLoadingTeams(false);
+        setIsLoadingStaff(false);
     }
-  }, [authLoading, companyId, fetchStaff, fetchTeams]);
+  }, [authLoading, companyId, teamsListCache, fetchAndCacheTeams, staffListCache, fetchAndCacheStaff]);
 
 
   const filteredTeams = useMemo(() => {
-    return teams.filter(team =>
+    if (!teamsListCache) return [];
+    return teamsListCache.filter(team =>
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (team.description && team.description.toLowerCase().includes(searchTerm.toLowerCase()))
     );
-  }, [teams, searchTerm]);
+  }, [teamsListCache, searchTerm]);
 
   const handleOpenCreateTeamDialog = () => {
-    setNewTeamForm(initialNewTeamState); 
+    setNewTeamForm(initialNewTeamState);
     setIsCreateTeamDialogOpen(true);
   };
 
@@ -154,22 +118,23 @@ export default function TeamsPage() {
       return;
     }
 
-    const manager = newTeamForm.managerId && newTeamForm.managerId !== 'no-manager'
-                    ? staffList.find(staff => staff.id === newTeamForm.managerId)
+    const manager = newTeamForm.managerId && newTeamForm.managerId !== 'no-manager' && staffListCache
+                    ? staffListCache.find(staff => staff.id === newTeamForm.managerId)
                     : undefined;
 
-    const newTeamData: Omit<Team, 'id' | 'createdAt' | 'updatedAt' | 'memberCount'> = {
+    const newTeamData: Omit<Team, 'id' | 'createdAt' | 'updatedAt'> = {
       name: newTeamForm.name,
       description: newTeamForm.description,
       managerId: manager ? manager.id : undefined,
       managerName: manager ? manager.name : undefined,
+      memberUserIds: [], // Initialize with empty members
+      memberCount: 0,   // Initialize member count
     };
 
     try {
       const teamsCollectionRef = collection(db, `companies/${companyId}/teams`);
       await addDoc(teamsCollectionRef, {
         ...newTeamData,
-        memberCount: 0, // Initialize member count
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -178,27 +143,45 @@ export default function TeamsPage() {
         description: `The team "${newTeamForm.name}" has been successfully created.`,
       });
       setIsCreateTeamDialogOpen(false);
-      fetchTeams(); // Re-fetch teams to update the list
-    } catch (error) {
+      await fetchAndCacheTeams(companyId); // Refresh the teams list from context
+    } catch (error: any) {
       console.error("Error creating team:", error);
-      toast({ title: "Error", description: "Could not create team.", variant: "destructive"});
+      if (error.code === 'permission-denied') {
+        toast({ title: "Permission Denied", description: "You do not have permission to create teams. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+      } else {
+        toast({ title: "Error Creating Team", description: `Could not create team: ${error.message || 'Unknown error'}`, variant: "destructive"});
+      }
     }
   };
+  
+  const openDeleteConfirmDialog = (team: Team) => {
+    setTeamToDelete(team);
+    setIsDeleteAlertOpen(true);
+  };
 
-  const handleDeleteTeam = async (teamId: string) => {
-    if (!companyId) return;
+  const handleDeleteTeam = async () => {
+    if (!teamToDelete || !companyId) return;
+    setIsDeleting(teamToDelete.id);
     try {
-      const teamDocRef = doc(db, `companies/${companyId}/teams`, teamId);
+      const teamDocRef = doc(db, `companies/${companyId}/teams`, teamToDelete.id);
       await deleteDoc(teamDocRef);
       toast({
           title: "Team Deleted",
-          description: "The team has been removed.",
+          description: `Team "${teamToDelete.name}" has been removed.`,
           variant: "default"
       });
-      fetchTeams(); // Re-fetch teams
-    } catch (error) {
+      await fetchAndCacheTeams(companyId); // Refresh the teams list from context
+    } catch (error: any) {
       console.error("Error deleting team:", error);
-      toast({ title: "Error", description: "Could not delete team.", variant: "destructive"});
+      if (error.code === 'permission-denied') {
+         toast({ title: "Permission Denied", description: "You do not have permission to delete teams. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+      } else {
+        toast({ title: "Error Deleting Team", description: `Could not delete team: ${error.message || 'Unknown error'}`, variant: "destructive"});
+      }
+    } finally {
+      setIsDeleting(null);
+      setIsDeleteAlertOpen(false);
+      setTeamToDelete(null);
     }
   };
 
@@ -270,7 +253,7 @@ export default function TeamsPage() {
                     <Skeleton className="h-10 w-full" />
                 ) : (
                     <Select
-                        value={newTeamForm.managerId}
+                        value={newTeamForm.managerId || 'no-manager'}
                         onValueChange={(value) => handleFormChange('managerId', value)}
                     >
                         <SelectTrigger id="newTeamManager">
@@ -278,13 +261,13 @@ export default function TeamsPage() {
                         </SelectTrigger>
                         <SelectContent>
                         <SelectItem value="no-manager">No Manager (Assign Later)</SelectItem>
-                        {staffList.map(staff => (
+                        {staffListCache && staffListCache.map(staff => (
                             <SelectItem key={staff.id} value={staff.id}>{staff.name} ({staff.email})</SelectItem>
                         ))}
                         </SelectContent>
                     </Select>
                 )}
-                {staffList.length === 0 && !isLoadingStaff && (
+                {(!staffListCache || staffListCache.length === 0) && !isLoadingStaff && (
                     <p className="text-xs text-muted-foreground">No staff available to assign as manager. Create staff members first.</p>
                 )}
               </div>
@@ -299,6 +282,23 @@ export default function TeamsPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the team "{teamToDelete?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setIsDeleteAlertOpen(false); setTeamToDelete(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTeam} disabled={isDeleting === teamToDelete?.id}>
+              {isDeleting === teamToDelete?.id ? 'Deleting...' : 'Yes, delete team'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {filteredTeams.length === 0 && searchTerm && !isLoadingTeams && (
         <Card className="text-center py-8">
           <CardHeader>
@@ -311,7 +311,7 @@ export default function TeamsPage() {
         </Card>
       )}
 
-      {teams.length === 0 && !searchTerm && !isLoadingTeams && (
+      {(!teamsListCache || teamsListCache.length === 0) && !searchTerm && !isLoadingTeams && (
          <Card className="text-center py-12">
           <CardHeader>
              <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -340,10 +340,10 @@ export default function TeamsPage() {
               <CardDescription className="text-xs text-muted-foreground">Managed by: {team.managerName || 'N/A'}</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
-              <p className="text-sm text-muted-foreground mb-3 min-h-[40px]">{team.description}</p>
+              <p className="text-sm text-muted-foreground mb-3 min-h-[40px]">{team.description || 'No description provided.'}</p>
               <div className="flex items-center text-sm">
                 <Users className="mr-2 h-4 w-4 text-primary" />
-                <span>{team.memberCount || 0} Members</span> {/* Default to 0 if undefined */}
+                <span>{team.memberCount || 0} Members</span>
               </div>
             </CardContent>
             <CardFooter className="border-t pt-4 flex justify-end gap-2">
@@ -352,8 +352,8 @@ export default function TeamsPage() {
                         <Settings className="mr-1 h-4 w-4" /> Manage
                     </Link>
                 </Button>
-                 <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteTeam(team.id)}>
-                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                 <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmDialog(team)} disabled={isDeleting === team.id}>
+                    {isDeleting === team.id ? 'Deleting...' : <><Trash2 className="mr-1 h-4 w-4" /> Delete</>}
                 </Button>
             </CardFooter>
           </Card>
