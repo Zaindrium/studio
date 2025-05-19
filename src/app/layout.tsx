@@ -1,19 +1,18 @@
 
 "use client"; 
 
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter, Roboto_Mono } from 'next/font/google'; // Changed imports
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-// Removed SplashScreen import as it's no longer used here
-import { AuthProvider } from '@/contexts/auth-context'; // Import AuthProvider
+import { AuthProvider } from '@/contexts/auth-context';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({ // Changed from Geist_Sans
+  variable: '--font-inter', // Updated CSS variable name
   subsets: ['latin'],
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const robotoMono = Roboto_Mono({ // Changed from Geist_Mono
+  variable: '--font-roboto-mono', // Updated CSS variable name
   subsets: ['latin'],
 });
 
@@ -22,18 +21,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Splash screen logic is removed as per previous requirements
-  // The AuthProvider will now wrap the children
-
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" className={`${inter.variable} ${robotoMono.variable} antialiased`}>
       <head>
         <title>LinkUP - Digital Business Cards</title>
         <meta name="description" content="Create and share your digital business card with LinkUP." />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#3F51B5" />
+        {/* Add links for actual app icons if you have them */}
+        {/* e.g., <link rel="icon" href="/favicon.ico" /> */}
+        {/* <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" /> */}
       </head>
       <body>
-        <AuthProvider> {/* Wrap children with AuthProvider */}
+        <AuthProvider>
           {children}
           <Toaster />
         </AuthProvider>
