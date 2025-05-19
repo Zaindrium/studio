@@ -1,3 +1,4 @@
+
 {
   "firestore": {
     "database": "(default)",
@@ -18,6 +19,7 @@
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"
       ]
+      // Reminder: Specify function regions (e.g., "europe-west1") in your index.js or during deployment for optimal latency.
     },
     {
       "source": "secondary",
@@ -32,10 +34,11 @@
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"
       ]
+      // Reminder: Specify function regions (e.g., "europe-west1") in your index.js or during deployment for optimal latency.
     }
   ],
   "hosting": {
-    "public": ".next", // Changed "source" to "public" and set to ".next"
+    "public": ".next",
     "ignore": [
       "firebase.json",
       "**/.*",
