@@ -3,19 +3,19 @@
 
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+// import { TemplatePicker } from '@/components/TemplatePicker'; // Commented out
 import { UserProfileForm } from '@/components/UserProfileForm';
 import { CardPreview } from '@/components/CardPreview';
-import type { StaffCardData, CardDesignSettings, AppPlan } from '@/lib/app-types';
+import type { StaffCardData, CardDesignSettings, AppPlan, StaffRecord } from '@/lib/app-types'; // Added StaffRecord
 import { APP_TEMPLATES, defaultStaffCardData, defaultCardDesignSettings } from '@/lib/app-types';
 import { sanitizeForUrl } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Blocks, Save, UserPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TemplatePicker } from '@/components/TemplatePicker';
 import { useAuth } from '@/contexts/auth-context';
-import { db, storage } from '@/lib/firebase'; // Import storage
+import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage'; // Import storage functions
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -37,33 +37,36 @@ interface NewStaffDialogFormState {
   email: string;
 }
 
-// Helper function to upload image if it's a data URL
 async function uploadImageAndGetURL(companyId: string, imagePath: string, dataUrl: string): Promise<string> {
   if (dataUrl.startsWith('data:')) {
     const storageRef = ref(storage, `companies/${companyId}/${imagePath}`);
     const snapshot = await uploadString(storageRef, dataUrl, 'data_url');
     return await getDownloadURL(snapshot.ref);
   }
-  return dataUrl; // Return original URL if not a data URL
+  return dataUrl;
 }
 
 export default function GeneratorPage() {
-  const { currentUser, companyId, fetchAndCacheStaff } = useAuth();
+  const { currentUser, companyId, companyProfile, fetchAndCacheStaff } = useAuth();
   const { toast } = useToast();
 
   const [staffCardProfile, setStaffCardProfile] = useState<StaffCardData>(() => {
-    const initialProfile = { ...defaultStaffCardData };
+    const initialProfileFromTemplate = APP_TEMPLATES[0]?.profile || { ...defaultStaffCardData };
+    const profileWithUser = { ...initialProfileFromTemplate };
     if (currentUser) {
-      initialProfile.name = currentUser.displayName || currentUser.email || defaultStaffCardData.name;
-      initialProfile.email = currentUser.email || defaultStaffCardData.email;
-      initialProfile.companyName = currentUser.adminProfile?.companyName || defaultStaffCardData.companyName;
-      initialProfile.profilePictureUrl = currentUser.photoURL || defaultStaffCardData.profilePictureUrl;
+      profileWithUser.name = currentUser.displayName || currentUser.email?.split('@')[0] || initialProfileFromTemplate.name;
+      profileWithUser.email = currentUser.email || initialProfileFromTemplate.email;
+      profileWithUser.companyName = companyProfile?.name || initialProfileFromTemplate.companyName;
+      profileWithUser.profilePictureUrl = currentUser.photoURL || initialProfileFromTemplate.profilePictureUrl;
     }
-    return initialProfile;
+    return profileWithUser;
   });
 
-  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(defaultCardDesignSettings);
-  const [currentTemplateId, setCurrentTemplateId] = useState<string>(APP_TEMPLATES[0]?.id || 'tech-innovator');
+  const [cardDesign, setCardDesign] = useState<CardDesignSettings>(
+    APP_TEMPLATES[0]?.design || { ...defaultCardDesignSettings }
+  );
+
+  // const [currentTemplateId, setCurrentTemplateId] = useState<string>(APP_TEMPLATES[0]?.id || 'tech-innovator'); // Commented out
   const [isClient, setIsClient] = useState(false);
   const [isSaveStaffDialogOpen, setIsSaveStaffDialogOpen] = useState(false);
   const [newStaffDialogForm, setNewStaffDialogForm] = useState<NewStaffDialogFormState>({ name: '', email: ''});
@@ -75,42 +78,72 @@ export default function GeneratorPage() {
   
   useEffect(() => {
     if (isClient) {
-      const selectedTemplate = APP_TEMPLATES.find(t => t.id === currentTemplateId) || APP_TEMPLATES[0];
-      if (selectedTemplate) {
-        setStaffCardProfile(prevProfile => {
-          const newProfile: StaffCardData = {
-            name: currentUser?.displayName || currentUser?.email || prevProfile.name || selectedTemplate.profile.name,
-            title: prevProfile.title || selectedTemplate.profile.title,
-            companyName: currentUser?.adminProfile?.companyName || prevProfile.companyName || selectedTemplate.profile.companyName,
-            phone: prevProfile.phone || selectedTemplate.profile.phone,
-            email: currentUser?.email || prevProfile.email || selectedTemplate.profile.email,
-            website: prevProfile.website || selectedTemplate.profile.website,
-            linkedin: prevProfile.linkedin || selectedTemplate.profile.linkedin,
-            address: prevProfile.address || selectedTemplate.profile.address,
-            profilePictureUrl: prevProfile.profilePictureUrl && !prevProfile.profilePictureUrl.startsWith('https://placehold.co') ? prevProfile.profilePictureUrl : currentUser?.photoURL || selectedTemplate.profile.profilePictureUrl,
-            cardBackgroundUrl: prevProfile.cardBackgroundUrl && !prevProfile.cardBackgroundUrl.startsWith('https://placehold.co') ? prevProfile.cardBackgroundUrl : selectedTemplate.profile.cardBackgroundUrl,
-            userInfo: prevProfile.userInfo || selectedTemplate.profile.userInfo,
-            targetAudience: prevProfile.targetAudience || selectedTemplate.profile.targetAudience,
-          };
+      // Logic for applying template data - now primarily driven by currentUser/companyProfile
+      const selectedTemplate = APP_TEMPLATES[0]; // Always use the first template as default without picker
+      
+      let initialProfile = selectedTemplate ? JSON.parse(JSON.stringify(selectedTemplate.profile)) : { ...defaultStaffCardData };
+      let initialDesign = selectedTemplate ? JSON.parse(JSON.stringify(selectedTemplate.design)) : { ...defaultCardDesignSettings };
+
+      setCardDesign(prevDesign => {
+        const newDesign = {
+            ...initialDesign,
+            qrCodeUrl: prevDesign.qrCodeUrl, // Preserve QR code if already generated
+            aiHint: prevDesign.aiHint || initialDesign.aiHint, // Preserve existing AI hint or take from new template
+        };
+        if (JSON.stringify(prevDesign) !== JSON.stringify(newDesign)) {
+          return newDesign;
+        }
+        return prevDesign;
+      });
+
+      setStaffCardProfile(currentProfile => {
+        const newProfile: StaffCardData = {
+          ...initialProfile,
+          name: currentUser?.displayName || currentUser?.email?.split('@')[0] || currentProfile.name || initialProfile.name,
+          title: currentProfile.title || initialProfile.title,
+          companyName: companyProfile?.name || currentProfile.companyName || initialProfile.companyName,
+          phone: currentProfile.phone || initialProfile.phone,
+          email: currentUser?.email || currentProfile.email || initialProfile.email,
+          website: currentProfile.website || initialProfile.website,
+          linkedin: currentProfile.linkedin || initialProfile.linkedin,
+          address: currentProfile.address || initialProfile.address,
+          profilePictureUrl: (currentProfile.profilePictureUrl && !currentProfile.profilePictureUrl.startsWith('https://placehold.co') && !currentProfile.profilePictureUrl.startsWith('data:')) 
+                             ? currentProfile.profilePictureUrl 
+                             : currentUser?.photoURL || initialProfile.profilePictureUrl,
+          cardBackgroundUrl: (currentProfile.cardBackgroundUrl && !currentProfile.cardBackgroundUrl.startsWith('https://placehold.co') && !currentProfile.cardBackgroundUrl.startsWith('data:')) 
+                              ? currentProfile.cardBackgroundUrl 
+                              : initialProfile.cardBackgroundUrl,
+          userInfo: currentProfile.userInfo || initialProfile.userInfo,
+          targetAudience: currentProfile.targetAudience || initialProfile.targetAudience,
+        };
+        if (JSON.stringify(currentProfile) !== JSON.stringify(newProfile)) {
           return newProfile;
-        });
-        setCardDesign(selectedTemplate.design);
-      }
+        }
+        return currentProfile;
+      });
     }
-  }, [currentTemplateId, currentUser, isClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, companyProfile, isClient]); // Removed currentTemplateId from dependencies
 
   useEffect(() => {
     if (isClient && staffCardProfile.name) {
       const cardIdentifier = sanitizeForUrl(staffCardProfile.name);
       const newQrCodeUrl = `${window.location.origin}/card/${cardIdentifier}-preview`; 
       setCardDesign(prev => {
-        if (prev.qrCodeUrl !== newQrCodeUrl) {
-          return { ...prev, qrCodeUrl: newQrCodeUrl };
+         const updatedDesign = { ...prev, qrCodeUrl: newQrCodeUrl };
+        if (JSON.stringify(prev) !== JSON.stringify(updatedDesign)) {
+          return updatedDesign;
         }
         return prev;
       });
     } else if (isClient && !staffCardProfile.name) {
-        setCardDesign(prev => ({ ...prev, qrCodeUrl: '' }));
+        setCardDesign(prev => {
+            const updatedDesign = { ...prev, qrCodeUrl: '' };
+            if (JSON.stringify(prev) !== JSON.stringify(updatedDesign)) {
+                return updatedDesign;
+            }
+            return prev;
+        });
     }
   }, [staffCardProfile.name, isClient]);
 
@@ -144,9 +177,9 @@ export default function GeneratorPage() {
     handleProfileChange(aiData);
   }, [handleProfileChange]);
 
-  const handleTemplateSelect = useCallback((templateId: string) => {
-    setCurrentTemplateId(templateId);
-  }, []); 
+  // const handleTemplateSelect = useCallback((templateId: string) => { // Commented out
+  //   setCurrentTemplateId(templateId);
+  // }, []); 
 
   const openSaveStaffDialog = () => {
     setNewStaffDialogForm({
@@ -186,7 +219,7 @@ export default function GeneratorPage() {
       }
 
       const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
-      const updatedStaffCardProfile = {
+      const updatedStaffCardProfileWithFinalImages = {
         ...staffCardProfile,
         name: newStaffDialogForm.name, 
         email: newStaffDialogForm.email,
@@ -197,10 +230,10 @@ export default function GeneratorPage() {
       const newStaffRecord = {
         name: newStaffDialogForm.name,
         email: newStaffDialogForm.email,
-        role: updatedStaffCardProfile.title ? (updatedStaffCardProfile.title.toLowerCase().includes('manager') ? 'Manager' : 'Employee') : 'Employee',
+        role: updatedStaffCardProfileWithFinalImages.title ? (updatedStaffCardProfileWithFinalImages.title.toLowerCase().includes('manager') ? 'Manager' : 'Employee') : 'Employee',
         status: 'Active',
         fingerprintUrl: sanitizeForUrl(`staff-${newStaffDialogForm.name}-${Date.now().toString(36)}`),
-        cardDisplayData: updatedStaffCardProfile,
+        cardDisplayData: updatedStaffCardProfileWithFinalImages,
         designSettings: cardDesign,
         cardsCreatedCount: 1,
         createdAt: serverTimestamp(),
@@ -209,7 +242,9 @@ export default function GeneratorPage() {
       };
       await addDoc(staffCollectionRef, newStaffRecord);
       toast({ title: "Success!", description: `New staff card for ${newStaffDialogForm.name} saved.`});
-      await fetchAndCacheStaff(companyId); 
+      if (fetchAndCacheStaff) {
+        await fetchAndCacheStaff(companyId);
+      }
       setIsSaveStaffDialogOpen(false);
     } catch (error: any) {
       console.error("Error saving new staff card:", error);
@@ -233,7 +268,7 @@ export default function GeneratorPage() {
                 <CardDescription>Design and customize digital business cards. This editor provides a live preview. To create or update a card for a specific staff member, go to the "Staff" section.</CardDescription>
             </CardHeader>
           </Card>
-          <Skeleton className="h-[80px] w-full rounded-lg mb-8" /> 
+          {/* <Skeleton className="h-[80px] w-full rounded-lg mb-8" />  // No template picker skeleton if commented out */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 space-y-8">
               <Skeleton className="h-[600px] w-full rounded-lg" />
@@ -256,15 +291,17 @@ export default function GeneratorPage() {
         <Card className="mb-6 shadow-none border-0 rounded-none">
           <CardHeader className="pb-2 pt-0 px-0">
               <CardTitle className="flex items-center text-xl"><Blocks className="mr-2 h-5 w-5 text-primary"/>Digital Card Editor</CardTitle>
-              <CardDescription>Design and customize a digital business card. Select a template to get started, then personalize the details. Use "Save as New Staff Card" to persist your design to a new staff member.</CardDescription>
+              <CardDescription>Design and customize a digital business card. The card initializes with a default template. Use "Save as New Staff Card" to persist your design to a new staff member.</CardDescription>
           </CardHeader>
         </Card>
 
+        {/* 
         <TemplatePicker 
             templates={APP_TEMPLATES} 
             currentTemplateId={currentTemplateId} 
             onTemplateSelect={handleTemplateSelect}
         /> 
+        */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start mt-8">
           <div className="lg:col-span-2 space-y-8">
@@ -284,7 +321,11 @@ export default function GeneratorPage() {
 
           <div className="lg:col-span-1 space-y-8 lg:sticky lg:top-8">
             <CardPreview profile={staffCardProfile} design={cardDesign} />
-            {staffCardProfile.name && cardDesign.qrCodeUrl && <ShareCard cardUrl={cardDesign.qrCodeUrl} />}
+            {staffCardProfile.name && cardDesign.qrCodeUrl && 
+                <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-lg" />}>
+                    <ShareCard cardUrl={cardDesign.qrCodeUrl} />
+                </Suspense>
+            }
              <Button onClick={openSaveStaffDialog} className="w-full" disabled={!companyId || isSavingStaff}>
               <Save className="mr-2 h-5 w-5" /> Save as New Staff Card
             </Button>
@@ -303,9 +344,9 @@ export default function GeneratorPage() {
           <form onSubmit={handleSaveNewStaffCard}>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="staffName">Staff Member's Full Name</Label>
+                <Label htmlFor="newStaffNameDialog">Staff Member's Full Name</Label>
                 <Input
-                  id="staffName"
+                  id="newStaffNameDialog"
                   value={newStaffDialogForm.name}
                   onChange={(e) => handleDialogFormChange('name', e.target.value)}
                   placeholder="e.g., Jane Smith"
@@ -313,9 +354,9 @@ export default function GeneratorPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="staffEmail">Staff Member's Email</Label>
+                <Label htmlFor="newStaffEmailDialog">Staff Member's Email</Label>
                 <Input
-                  id="staffEmail"
+                  id="newStaffEmailDialog"
                   type="email"
                   value={newStaffDialogForm.email} 
                   onChange={(e) => handleDialogFormChange('email', e.target.value)}
