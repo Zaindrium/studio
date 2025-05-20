@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Mail, Key, LogIn, HelpCircle, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { CompanyProfile, AdminUser, PlanId } from '@/lib/app-types';
 import { APP_PLANS } from '@/lib/app-types';
@@ -195,7 +195,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     if (!email) {
       toast({
         title: "Enter Email",
@@ -204,11 +204,32 @@ export default function LoginPage() {
       });
       return;
     }
-    toast({
-      title: "Password Reset (Simulated)",
-      description: `If an account exists for ${email}, a password reset link would be sent. (This is a simulation)`,
-      duration: 7000,
-    });
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: "Password Reset Email Sent",
+        description: `If an account exists for ${email}, a password reset link has been sent. Please check your inbox.`,
+        variant: "default",
+        duration: 7000,
+      });
+    } catch (error: any) {
+      console.error("Password Reset Failed:", error);
+      let description = "Failed to send password reset email. Please try again.";
+      if (error.code === 'auth/invalid-email') {
+        description = "The email address is not valid. Please check and try again.";
+      } else if (error.code === 'auth/user-not-found') {
+        description = "No account found with this email address.";
+      }
+      toast({
+        title: "Password Reset Failed",
+        description: description,
+        variant: "destructive",
+        duration: 7000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

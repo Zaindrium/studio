@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { StaffCardData } from '@/lib/app-types'; // Updated to StaffCardData
+import type { StaffCardData } from '@/lib/app-types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -18,10 +18,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Briefcase, Phone, Mail, Globe, Linkedin, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2 } from 'lucide-react'; // Removed Twitter, Github
+import { User, Briefcase, Phone, Mail, Globe, Linkedin, MapPin, Info, Users, Image as ImageIcon, ImagePlus, UploadCloud, Trash2, Crop } from 'lucide-react'; 
 import React, { useRef, memo } from 'react';
 
-// Schema reflects fields for StaffCardData
 const staffCardSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
@@ -30,8 +29,6 @@ const staffCardSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
   website: z.string().url({ message: 'Invalid URL.' }).optional().or(z.literal('')),
   linkedin: z.string().optional(),
-  // twitter: z.string().optional(), // Removed
-  // github: z.string().optional(), // Removed
   address: z.string().optional(),
   profilePictureUrl: z.string().optional().or(z.literal('')),
   cardBackgroundUrl: z.string().optional().or(z.literal('')),
@@ -89,6 +86,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
         <Form {...form}>
           <form className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Other form fields remain unchanged ... */}
               <FormField
                 control={form.control}
                 name="name"
@@ -180,7 +178,6 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                   </FormItem>
                 )}
               />
-              {/* Twitter and GitHub fields removed */}
               <FormField
                 control={form.control}
                 name="address"
@@ -206,7 +203,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                     <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                       <Input
                         type="file"
-                        accept="image/*"
+                        accept="image/png, image/jpeg, image/webp"
                         ref={profilePictureInputRef}
                         onChange={(e) => handleFileChange(e, 'profilePictureUrl')}
                         className="hidden"
@@ -234,11 +231,12 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                       )}
                     </div>
                   </FormControl>
-                  <FormDescription>
+                  <FormDescription className="flex items-center">
+                    <Crop className="mr-2 h-3 w-3 text-muted-foreground" /> 
                     {form.watch('profilePictureUrl') && typeof form.watch('profilePictureUrl') === 'string' && !form.watch('profilePictureUrl').startsWith('data:') ?
-                    `Current URL: ${form.watch('profilePictureUrl')}` :
+                    `Current: ${form.watch('profilePictureUrl').substring(0,50)}...` :
                     form.watch('profilePictureUrl') ? 'New photo selected.' : 'No photo selected.'}
-                     Ideal aspect ratio: 1:1.
+                     Best with a 1:1 (square) aspect ratio. Please crop before uploading for best results.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -255,7 +253,7 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                      <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
                       <Input
                         type="file"
-                        accept="image/*"
+                        accept="image/png, image/jpeg, image/webp"
                         ref={cardBackgroundInputRef}
                         onChange={(e) => handleFileChange(e, 'cardBackgroundUrl')}
                         className="hidden"
@@ -283,11 +281,12 @@ const UserProfileFormComponent = ({ profile, onProfileChange }: UserProfileFormP
                       )}
                     </div>
                   </FormControl>
-                  <FormDescription>
+                  <FormDescription className="flex items-center">
+                     <Crop className="mr-2 h-3 w-3 text-muted-foreground" /> 
                     {form.watch('cardBackgroundUrl') && typeof form.watch('cardBackgroundUrl') === 'string' && !form.watch('cardBackgroundUrl').startsWith('data:') ?
-                     `Current URL: ${form.watch('cardBackgroundUrl')}` :
+                     `Current: ${form.watch('cardBackgroundUrl').substring(0,50)}...` :
                      form.watch('cardBackgroundUrl') ? 'New background selected.' : 'No background selected.'}
-                     Ideal aspect ratio: 9:16 (portrait).
+                     Consider a 9:16 (portrait) aspect ratio. Please crop before uploading for best results.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

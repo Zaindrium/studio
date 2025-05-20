@@ -125,8 +125,8 @@ export default function TeamsPage() {
     const newTeamData: Omit<Team, 'id' | 'createdAt' | 'updatedAt'> = {
       name: newTeamForm.name,
       description: newTeamForm.description,
-      managerId: manager ? manager.id : undefined,
-      managerName: manager ? manager.name : undefined,
+      managerId: manager ? manager.id : null, // Changed to null
+      managerName: manager ? manager.name : null, // Changed to null
       memberUserIds: [], // Initialize with empty members
       memberCount: 0,   // Initialize member count
     };

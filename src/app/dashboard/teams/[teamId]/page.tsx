@@ -17,6 +17,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -31,24 +32,38 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import type { TeamMember, AssignedTemplate, TeamMetrics, DetailedTeam, StaffRecord } from '@/lib/app-types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, deleteDoc, Timestamp, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove, deleteDoc, Timestamp, increment, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import EditTeamDialog from '@/components/dashboard/teams/EditTeamDialog';
 
+interface EditTeamFormState {
+  name: string;
+  description: string;
+  managerId: string | null;
+}
 
 export default function TeamDetailPage() {
   const params = useParams();
   const router = useRouter();
   const teamId = params.teamId as string;
   const { toast } = useToast();
-  const { companyId, loading: authLoading, fetchAndCacheTeams, staffListCache, fetchAndCacheStaff } = useAuth();
+  const { 
+    companyId, 
+    loading: authLoading, 
+    fetchAndCacheTeams, 
+    staffListCache, 
+    fetchAndCacheStaff, 
+    isInitialDataLoaded // Destructure isInitialDataLoaded
+  } = useAuth();
 
   const [currentTeam, setCurrentTeam] = useState<DetailedTeam | null>(null);
   const [isLoadingTeam, setIsLoadingTeam] = useState(true);
   const [isManageMembersDialogOpen, setIsManageMembersDialogOpen] = useState(false);
-  const [isLoadingOrgStaff, setIsLoadingOrgStaff] = useState(true);
+  const [isLoadingOrgStaff, setIsLoadingOrgStaff] = useState(true); // Keep this for the dialog
   const [isDeletingTeam, setIsDeletingTeam] = useState(false);
   const [isDeleteTeamAlertOpen, setIsDeleteTeamAlertOpen] = useState(false);
+  const [isEditTeamDialogOpen, setIsEditTeamDialogOpen] = useState(false);
   
   const calculateTeamMetrics = (team: DetailedTeam | null): TeamMetrics => {
     if (!team || !team.members || team.members.length === 0) {
@@ -73,9 +88,6 @@ export default function TeamDetailPage() {
 
   const fetchTeamDetails = useCallback(async () => {
     if (!companyId || !teamId) {
-      if (!authLoading) {
-        // toast({ title: "Error", description: "Company or Team ID missing.", variant: "destructive" });
-      }
       setIsLoadingTeam(false);
       return;
     }
@@ -86,11 +98,9 @@ export default function TeamDetailPage() {
 
       if (teamDocSnap.exists()) {
         const teamData = teamDocSnap.data() as Omit<DetailedTeam, 'id' | 'members' | 'teamMetrics'>;
-        
         let members: TeamMember[] = [];
         if (teamData.memberUserIds && teamData.memberUserIds.length > 0) {
           const staffCollectionRef = collection(db, `companies/${companyId}/staff`);
-          // Firestore 'in' query limit is 30. For more, fetch in batches or restructure.
           const membersQuery = query(staffCollectionRef, where('__name__', 'in', teamData.memberUserIds.slice(0,30)));
           const membersSnap = await getDocs(membersQuery);
           members = membersSnap.docs.map(docSnap => {
@@ -105,7 +115,6 @@ export default function TeamDetailPage() {
             };
           });
         }
-
         const fullTeamData: DetailedTeam = {
           id: teamDocSnap.id,
           ...teamData,
@@ -115,7 +124,6 @@ export default function TeamDetailPage() {
         };
         fullTeamData.teamMetrics = calculateTeamMetrics(fullTeamData);
         setCurrentTeam(fullTeamData);
-
       } else {
         toast({ title: "Error", description: "Team not found.", variant: "destructive" });
         setCurrentTeam(null);
@@ -124,29 +132,92 @@ export default function TeamDetailPage() {
     } catch (error: any) {
       console.error("Error fetching team details:", error);
       if (error.code === 'permission-denied') {
-        toast({ title: "Permission Denied", description: "You do not have permission to view this team. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        toast({ title: "Permission Denied", description: "You do not have permission to view this team.", variant: "destructive"});
       } else {
-        toast({ title: "Error Fetching Team", description: `Could not fetch team details: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Error Fetching Team", description: `Could not fetch team details: ${error.message}` , variant: "destructive" });
       }
     } finally {
       setIsLoadingTeam(false);
     }
-  }, [companyId, teamId, toast, router, authLoading]);
+  }, [companyId, teamId, toast, router]);
 
+  // useEffect for fetching team details (remains largely the same)
   useEffect(() => {
     if (!authLoading && companyId) {
       fetchTeamDetails();
-      if (!staffListCache) {
-        fetchAndCacheStaff(companyId).finally(() => setIsLoadingOrgStaff(false));
-      } else {
-        setIsLoadingOrgStaff(false);
-      }
     } else if (!authLoading && !companyId) {
-        setIsLoadingTeam(false);
-        setIsLoadingOrgStaff(false);
+      setIsLoadingTeam(false);
     }
-  }, [authLoading, companyId, fetchTeamDetails, staffListCache, fetchAndCacheStaff]);
+  }, [authLoading, companyId, fetchTeamDetails]);
 
+  // useEffect for managing staff loading state based on AuthContext
+  useEffect(() => {
+    if (authLoading) {
+      setIsLoadingOrgStaff(true);
+    } else if (companyId && !isInitialDataLoaded) {
+      // Auth is done, companyId is present, but initial context data (including staff) might still be loading
+      setIsLoadingOrgStaff(true);
+    } else if (companyId && isInitialDataLoaded) {
+      // Auth is done, companyId is present, and initial context data has been loaded
+      // At this point, staffListCache from context is the source of truth for already fetched staff.
+      // If it's null, it means no staff or fetch failed in context, but context loading is "done".
+      setIsLoadingOrgStaff(false); 
+      // If staffListCache is null and you absolutely need staff for this page to function,
+      // you could dispatch another fetchAndCacheStaff(companyId) here,
+      // but it might conflict with context's own management.
+      // For now, we assume context handles it, and if staffListCache is null, there's no staff.
+    } else {
+      // No companyId or other edge cases
+      setIsLoadingOrgStaff(false);
+    }
+  }, [authLoading, companyId, isInitialDataLoaded, staffListCache]);
+
+
+  const handleOpenEditTeamDialog = () => {
+    if (currentTeam) {
+      setIsEditTeamDialogOpen(true);
+    }
+  };
+
+  const handleUpdateTeam = async (updatedData: EditTeamFormState) => {
+    if (!currentTeam || !companyId) {
+      toast({ title: "Error", description: "Cannot update team: Missing critical data.", variant: "destructive" });
+      return Promise.reject(new Error("Missing critical data for team update"));
+    }
+    
+    const { name, description, managerId } = updatedData;
+    let managerName: string | null = null;
+
+    if (managerId && managerId !== 'no-manager' && staffListCache) {
+      const manager = staffListCache.find(staff => staff.id === managerId);
+      if (manager) {
+        managerName = manager.name;
+      }
+    } 
+
+    const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
+    try {
+      await updateDoc(teamDocRef, {
+        name: name,
+        description: description,
+        managerId: managerId === 'no-manager' ? null : managerId,
+        managerName: managerName, 
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "Team Updated", description: `"${name}" has been successfully updated.` });
+      await fetchTeamDetails(); 
+      await fetchAndCacheTeams(companyId); 
+      setIsEditTeamDialogOpen(false); 
+    } catch (error: any) {
+      console.error("Error updating team:", error);
+      if (error.code === 'permission-denied') {
+        toast({ title: "Permission Denied", description: "You do not have permission to update this team.", variant: "destructive"});
+      } else {
+        toast({ title: "Error Updating Team", description: `Could not update team: ${error.message}`, variant: "destructive" });
+      }
+      throw error; 
+    }
+  };
 
   const handleDeleteTeam = async () => {
     if (!currentTeam || !companyId) return;
@@ -159,14 +230,14 @@ export default function TeamDetailPage() {
         description: `Team "${currentTeam.name}" has been deleted.`,
         variant: "default",
       });
-      await fetchAndCacheTeams(companyId); // Refresh team list in context
+      await fetchAndCacheTeams(companyId);
       router.push('/dashboard/teams');
     } catch (error: any) {
       console.error("Error deleting team:", error);
       if (error.code === 'permission-denied') {
-         toast({ title: "Permission Denied", description: "You do not have permission to delete this team. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+         toast({ title: "Permission Denied", description: "You do not have permission to delete this team.", variant: "destructive"});
       } else {
-        toast({ title: "Error Deleting Team", description: `Could not delete team: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Error Deleting Team", description: `Could not delete team: ${error.message}` , variant: "destructive" });
       }
     } finally {
         setIsDeletingTeam(false);
@@ -177,14 +248,15 @@ export default function TeamDetailPage() {
   const handleRemoveMember = async (memberId: string) => {
     if (!currentTeam || !companyId) return;
     const memberToRemove = currentTeam.members.find(m => m.id === memberId);
+    setIsLoadingOrgStaff(true); // Indicate loading while members change
     try {
       const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
       await updateDoc(teamDocRef, {
         memberUserIds: arrayRemove(memberId),
-        memberCount: increment(-1) // Decrement member count
+        memberCount: increment(-1)
       });
-      await fetchTeamDetails(); // Re-fetch team details to update member list and metrics
-      await fetchAndCacheTeams(companyId); // Refresh global teams cache
+      await fetchTeamDetails(); 
+      await fetchAndCacheTeams(companyId); // This might trigger context-based staffListCache update too
       toast({
         title: "Member Removed",
         description: `${memberToRemove?.name || 'Member'} has been removed from the team.`,
@@ -192,10 +264,12 @@ export default function TeamDetailPage() {
     } catch (error: any) {
       console.error("Error removing member:", error);
       if (error.code === 'permission-denied') {
-        toast({ title: "Permission Denied", description: "You do not have permission to remove members. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+        toast({ title: "Permission Denied", description: "You do not have permission to remove members.", variant: "destructive"});
       } else {
-        toast({ title: "Error Removing Member", description: `Could not remove member: ${error.message || 'Unknown error'}`, variant: "destructive" });
+        toast({ title: "Error Removing Member", description: `Could not remove member: ${error.message}` , variant: "destructive" });
       }
+    } finally {
+      setIsLoadingOrgStaff(false); // Reset loading state
     }
   };
 
@@ -203,14 +277,15 @@ export default function TeamDetailPage() {
     if (!currentTeam || !companyId || !staffListCache) return;
     const staffToAdd = staffListCache.find(u => u.id === staffId);
     if (staffToAdd && !currentTeam.members.find(m => m.id === staffId)) {
+      setIsLoadingOrgStaff(true); // Indicate loading while members change
       try {
         const teamDocRef = doc(db, `companies/${companyId}/teams`, currentTeam.id);
         await updateDoc(teamDocRef, {
           memberUserIds: arrayUnion(staffId),
-          memberCount: increment(1) // Increment member count
+          memberCount: increment(1)
         });
-        await fetchTeamDetails(); // Re-fetch team details
-        await fetchAndCacheTeams(companyId); // Refresh global teams cache
+        await fetchTeamDetails(); 
+        await fetchAndCacheTeams(companyId); // This might trigger context-based staffListCache update too
         toast({
           title: "Member Added",
           description: `${staffToAdd.name} has been added to the team.`,
@@ -218,10 +293,12 @@ export default function TeamDetailPage() {
       } catch (error: any) {
         console.error("Error adding member:", error);
         if (error.code === 'permission-denied') {
-          toast({ title: "Permission Denied", description: "You do not have permission to add members. Please check your Firestore Security Rules.", variant: "destructive", duration: 7000 });
+          toast({ title: "Permission Denied", description: "You do not have permission to add members.", variant: "destructive"});
         } else {
-          toast({ title: "Error Adding Member", description: `Could not add member: ${error.message || 'Unknown error'}`, variant: "destructive" });
+          toast({ title: "Error Adding Member", description: `Could not add member: ${error.message}` , variant: "destructive" });
         }
+      } finally {
+        setIsLoadingOrgStaff(false); // Reset loading state
       }
     }
   };
@@ -230,6 +307,7 @@ export default function TeamDetailPage() {
     orgUser => !currentTeam?.members.find(teamMember => teamMember.id === orgUser.id)
   ) : [];
 
+  // Main page loading state (for team details)
   if (authLoading || isLoadingTeam) {
     return (
       <div className="space-y-6">
@@ -260,7 +338,6 @@ export default function TeamDetailPage() {
     );
   }
 
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -274,7 +351,7 @@ export default function TeamDetailPage() {
           <p className="text-muted-foreground">{currentTeam.description || 'No description provided.'}</p>
           <p className="text-sm text-muted-foreground mt-1">Managed by: {currentTeam.managerName || 'N/A'}</p>
         </div>
-        <Button variant="outline" disabled> {/* TODO: Implement Edit Team Dialog */}
+        <Button variant="outline" onClick={handleOpenEditTeamDialog} disabled={!currentTeam}>
           <Edit className="mr-2 h-4 w-4" /> Edit Team Details
         </Button>
       </div>
@@ -302,6 +379,7 @@ export default function TeamDetailPage() {
             )}
           </CardContent>
           <CardFooter className="border-t pt-4">
+            {/* Button to open Manage Members Dialog, disabled based on isLoadingOrgStaff */}
             <Button onClick={() => setIsManageMembersDialogOpen(true)} variant="default" className="w-full" disabled={isLoadingOrgStaff}>
               <UserPlus className="mr-2 h-4 w-4" /> {isLoadingOrgStaff ? 'Loading Staff...' : 'Add/Remove Members'}
             </Button>
@@ -373,6 +451,7 @@ export default function TeamDetailPage() {
             <div className="space-y-3">
               <h3 className="text-lg font-medium text-foreground">Available Organization Staff ({availableUsersToAdd.length})</h3>
                <ScrollArea className="h-[45vh] rounded-md border p-3">
+                 {/* Skeleton for available staff list, controlled by isLoadingOrgStaff */}
                  {isLoadingOrgStaff ? <Skeleton className="h-20 w-full" /> : 
                   availableUsersToAdd.length > 0 ? (
                   <ul className="space-y-2">
@@ -435,7 +514,7 @@ export default function TeamDetailPage() {
                 <h4 className="font-medium mb-1">Team Manager</h4>
                 <p className="text-sm text-muted-foreground p-2 border rounded bg-secondary/20">{currentTeam.managerName || 'N/A'}</p>
             </div>
-             <Button variant="outline" className="w-full" disabled> {/* TODO: Implement Edit Team Dialog */}
+             <Button variant="outline" className="w-full" onClick={handleOpenEditTeamDialog} disabled={!currentTeam}>
               <Edit className="mr-2 h-4 w-4" /> Modify Name, Description, or Manager
             </Button>
             <AlertDialog open={isDeleteTeamAlertOpen} onOpenChange={setIsDeleteTeamAlertOpen}>
@@ -464,6 +543,17 @@ export default function TeamDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {currentTeam && (
+        <EditTeamDialog
+          open={isEditTeamDialogOpen}
+          onOpenChange={setIsEditTeamDialogOpen}
+          team={currentTeam} 
+          staffList={staffListCache || []} 
+          onSave={handleUpdateTeam} 
+          isLoadingStaff={isLoadingOrgStaff} // Pass this state to the dialog
+        />
+      )}
     </div>
   );
 }

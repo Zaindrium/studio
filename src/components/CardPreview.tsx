@@ -4,7 +4,7 @@
 import React from 'react';
 import type { StaffCardData, CardDesignSettings } from '@/lib/app-types';
 import NextImage from 'next/image';
-import { Phone, Mail, Globe, Linkedin, MapPin, UserCircle2, Building, Download } from 'lucide-react'; // Removed Twitter, Github
+import { Phone, Mail, Globe, Linkedin, MapPin, UserCircle2, Building, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -76,15 +76,14 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
 
 
   const cardContent = (
-    <div className="relative w-full h-full"> 
+    <div className="relative w-full h-full pt-2 sm:pt-3"> {/* Added padding to the main content wrapper */}
       {showBackgroundImage ? (
         <NextImage
           src={profile.cardBackgroundUrl!} 
           alt={profile.name ? `${profile.name}'s card background` : "Card background"}
-          layout="fill" 
-          objectFit="cover" 
-          objectPosition="center" 
-          className="z-0" 
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className="object-cover object-center z-0"
           data-ai-hint={design.aiHint || "abstract background"}
           priority={isPublicView}
         />
@@ -98,8 +97,8 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
         style={{...cardBaseStyle, backgroundColor: showBackgroundImage ? 'transparent' : cardBaseStyle.backgroundColor}}
       >
         <div className={cn(
-          "flex-shrink-0 pt-4",
-          design.layout === 'image-top' ? 'flex flex-col items-center text-center' : 'flex flex-row items-center gap-3 sm:gap-4',
+          "flex-shrink-0",
+          design.layout === 'image-top' ? 'flex flex-col items-center text-center mb-3 sm:mb-4' : 'flex flex-row items-center gap-3 sm:gap-4 mb-2 sm:mb-3', // Added bottom margin
         )}>
           <div className={cn(
             "flex-shrink-0",
@@ -115,7 +114,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
                 height={design.layout === 'image-top' ? 96 : 80}
                 className={cn("rounded-full object-cover border-2", profileImageSizeClass)}
                 style={{ borderColor: design.colorScheme.primaryColor }}
-                data-ai-hint="person portrait"
+                data-ai-hint={profile.profilePictureUrl?.includes('placehold.co') ? "person avatar" : undefined}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.src = `https://placehold.co/${design.layout === 'image-top' ? 96 : 80}x${design.layout === 'image-top' ? 96 : 80}.png`;
@@ -153,7 +152,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
                         width={80} 
                         height={30}
                         className="object-contain"
-                        data-ai-hint="company logo"
+                        data-ai-hint={profile.companyLogoUrl?.includes('placehold.co') ? "company logo" : undefined}
                     />
                 </div>
             )}
@@ -166,7 +165,7 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
         </div>
 
         <div className={cn(
-            "my-2 sm:my-3 space-y-1.5 sm:space-y-2 overflow-y-auto px-1 flex-grow",
+            "my-2 sm:my-3 space-y-2 sm:space-y-2.5 overflow-y-auto px-1 flex-grow", // Increased spacing
             design.layout === 'image-right' ? 'items-end flex flex-col' : design.layout === 'image-left' ? 'items-start flex flex-col' : 'items-center flex flex-col text-center'
           )}>
           {[
@@ -174,13 +173,11 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
             { key: 'phone', icon: Phone, value: profile.phone, hrefPrefix: 'tel:' },
             { key: 'website', icon: Globe, value: profile.website, hrefPrefix: '' },
             { key: 'linkedin', icon: Linkedin, value: profile.linkedin, hrefPrefix: '' },
-            // { key: 'twitter', icon: Twitter, value: profile.twitter, hrefPrefix: profile.twitter?.startsWith('@') ? 'https://twitter.com/' : '' , transformValue: (val:string) => val.startsWith('@') ? val.substring(1) : val }, // Removed
-            // { key: 'github', icon: Github, value: profile.github, hrefPrefix: profile.github?.includes('/') ? '' : 'https://github.com/' }, // Removed
             { key: 'address', icon: MapPin, value: profile.address },
           ].map((item) => {
             if (item.value && item.value.trim() !== '') { 
             const IconComponent = item.icon;
-            const displayValue = item.transformValue ? item.transformValue(item.value) : item.value;
+            const displayValue = item.value; // No transformValue needed now
             const hrefValue = item.hrefPrefix !== undefined ? ensureHttps(item.hrefPrefix + displayValue) : undefined;
             
             return (
@@ -202,8 +199,8 @@ function CardPreviewComponent({ profile, design, isPublicView = false, onSaveCon
           })}
 
           {profile.userInfo && ( 
-            <div className="pt-2 mt-2 border-t w-full max-h-20 sm:max-h-24 overflow-y-auto" style={{borderColor: design.colorScheme.primaryColor + '50'}}>
-              <h3 className="font-semibold text-sm mb-1 sticky top-0 bg-transparent" style={{...textPrimaryColorStyle, ...textShadow}}>About { isPublicView ? (profile.name || "Staff") : "Staff"}</h3>
+            <div className="pt-2 sm:pt-3 mt-2 sm:mt-3 border-t w-full max-h-20 sm:max-h-24 overflow-y-auto" style={{borderColor: design.colorScheme.primaryColor + '50'}}>
+              <h3 className="font-semibold text-sm mb-1 sticky top-0 bg-transparent" style={{...textPrimaryColorStyle, ...textShadow}}>About { isPublicView ? (profile.name?.split(' ')[0] || "Staff") : "Staff"}</h3>
               <p className={cn("text-xs whitespace-pre-wrap break-words")} style={combinedTextStyles}>{profile.userInfo}</p>
             </div>
           )}

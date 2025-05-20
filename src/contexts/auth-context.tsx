@@ -10,7 +10,7 @@ import { APP_PLANS } from '@/lib/app-types';
 
 const DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY: PlanId = APP_PLANS.find(p => p.id === 'growth')?.id || 'growth';
 const LOWEST_TIER_PLAN_ID: PlanId = APP_PLANS.find(p => p.id === 'free')?.id || 'free';
-const INITIAL_FETCH_LIMIT = 10; // For initial caching in AuthContext
+const INITIAL_FETCH_LIMIT = 10; 
 
 interface AuthContextType {
   currentUser: (FirebaseUser & { adminProfile?: AdminUser }) | null;
@@ -19,13 +19,13 @@ interface AuthContextType {
   companyProfile: CompanyProfile | null;
   activePlanId: PlanId | null;
   updateCompanyPlan: (planId: PlanId) => Promise<void>;
-  fetchCompanyProfile: () => Promise<void>;
-  isInitialDataLoaded: boolean; // Indicates if initial auth-dependent data (company, basic lists) has been fetched
-  staffListCache: StaffRecord[] | null; // Will store only the first page or be a signal
+  fetchCompanyProfile: () => Promise<void>; // Kept for manual refresh scenarios if ever needed
+  isInitialDataLoaded: boolean; 
+  staffListCache: StaffRecord[] | null; 
   teamsListCache: Team[] | null;
   adminListCache: AdminUser[] | null;
   rolesListCache: Role[] | null;
-  fetchAndCacheStaff: (companyId: string, lastDoc?: DocumentSnapshot) => Promise<{newStaffList: StaffRecord[], newLastDoc?: DocumentSnapshot}>; // Modified for pagination support
+  fetchAndCacheStaff: (companyId: string, lastDoc?: DocumentSnapshot) => Promise<{newStaffList: StaffRecord[], newLastDoc?: DocumentSnapshot}>; 
   fetchAndCacheTeams: (companyId: string) => Promise<void>;
   fetchAndCacheAdmins: (companyId: string) => Promise<void>;
   fetchAndCacheRoles: (companyId: string) => Promise<void>;
@@ -53,6 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // This specific fetch function is now primarily for manual refresh if needed elsewhere, 
+  // as onAuthStateChanged handles initial fetch-or-create.
   const fetchCompanyProfileData = useCallback(async (cid: string) => {
     if (!cid) {
       setCompanyProfile(null);
@@ -67,12 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCompanyProfile(companyData);
         setActivePlanId(companyData.activePlanId || LOWEST_TIER_PLAN_ID);
       } else {
-        console.warn(`Company profile not found for ID: ${cid}.`);
+        console.warn(`Company profile not found via manual fetch for ID: ${cid}. This implies an issue if user is logged in.`);
         setCompanyProfile(null);
-        setActivePlanId(LOWEST_TIER_PLAN_ID);
+        setActivePlanId(LOWEST_TIER_PLAN_ID); 
       }
     } catch (error: any) {
-      console.error("Error fetching company profile:", error);
+      console.error("Error fetching company profile via manual fetch:", error);
       setCompanyProfile(null);
       setActivePlanId(LOWEST_TIER_PLAN_ID);
       if (error.code === 'permission-denied') {
@@ -89,7 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const companyRef = doc(db, "companies", companyId);
         await updateDoc(companyRef, { activePlanId: planId, updatedAt: serverTimestamp() });
         setActivePlanId(planId);
-        setCompanyProfile(prev => prev ? { ...prev, activePlanId: planId, updatedAt: serverTimestamp() } : null);
+        setCompanyProfile(prev => prev ? { ...prev, activePlanId: planId, updatedAt: serverTimestamp() as Timestamp } : null);
+        showToast("Plan Updated", `Your subscription plan has been changed.`);
       } catch (error: any) {
         console.error("Error updating company plan in Firestore:", error);
         if (error.code === 'permission-denied') {
@@ -111,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     collectionName: string,
     setter: React.Dispatch<React.SetStateAction<T[] | null>>,
     cacheName: string,
-    shouldPaginate: boolean = false // New parameter
+    shouldPaginate: boolean = false 
   ) => {
     return useCallback(async (cid: string, lastDoc?: DocumentSnapshot): Promise<{newList: T[], newLastDoc?: DocumentSnapshot}> => {
       if (!cid) {
@@ -122,30 +125,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const collectionRef = collection(db, `companies/${cid}/${collectionName}`);
         let q;
         if (shouldPaginate) {
-            q = query(collectionRef, orderBy("name"), limit(INITIAL_FETCH_LIMIT)); // Example: order by name for staff
+            // Example: order by name for staff, can be made more generic if needed
+            const orderByField = collectionName === 'staff' ? 'name' : 'createdAt'; // staff by name, others by createdAt
+            q = query(collectionRef, orderBy(orderByField), limit(INITIAL_FETCH_LIMIT)); 
             if (lastDoc) {
-                q = query(collectionRef, orderBy("name"), startAfter(lastDoc), limit(INITIAL_FETCH_LIMIT));
+                q = query(collectionRef, orderBy(orderByField), startAfter(lastDoc), limit(INITIAL_FETCH_LIMIT));
             }
         } else {
-            q = query(collectionRef, orderBy("name")); // Default: order by name
+            q = query(collectionRef, orderBy("name")); // Default: order by name for non-paginated, or choose another default like createdAt
         }
         
         const querySnapshot = await getDocs(q);
         const fetchedItems: T[] = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as T));
         
-        if (shouldPaginate) {
-            // For paginated cache in AuthContext, we only store the first page
-            // Or simply indicate that data might exist but let the page handle full pagination
-            setter(fetchedItems.length > 0 ? fetchedItems : []); // Store first page or empty if nothing found
+        if (shouldPaginate && collectionName === 'staff') { // Only apply special pagination cache handling for staff for now
+            setter(prev => {
+                if (!lastDoc) return fetchedItems; // First page, replace cache
+                const combined = prev ? [...prev, ...fetchedItems] : fetchedItems;
+                const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+                return unique;
+            });
             return { newList: fetchedItems, newLastDoc: querySnapshot.docs[querySnapshot.docs.length -1] };
         } else {
-            setter(fetchedItems);
-            return { newList: fetchedItems, newLastDoc: undefined };
+            setter(fetchedItems); // For non-staff or non-paginated, replace cache directly
+            return { newList: fetchedItems, newLastDoc: shouldPaginate ? querySnapshot.docs[querySnapshot.docs.length -1] : undefined };
         }
 
       } catch (error: any) {
         console.error(`Error fetching ${cacheName} for cache:`, error);
-        setter([]); 
+        setter(prev => prev || []); // Keep existing cache on error, or empty array if null
         if (error.code === 'permission-denied') {
             showToast("Permission Denied", `Could not fetch ${cacheName}. Check Firestore rules.`, "destructive");
         }
@@ -163,6 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       setIsInitialDataLoaded(false);
+      // Clear all caches on auth state change initially
+      setCompanyProfile(null); setActivePlanId(null); setStaffListCache(null);
+      setTeamsListCache(null); setAdminListCache(null); setRolesListCache(null);
+
       if (user) {
         const currentCompanyId = user.uid; 
         setCompanyId(currentCompanyId);
@@ -170,55 +182,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let fetchedAdminProfile: AdminUser | undefined;
         try {
           const adminUserRef = doc(db, `companies/${currentCompanyId}/admins/${user.uid}`);
-          const adminDocSnap = await getDoc(adminUserRef);
-          if (adminDocSnap.exists()) {
-            fetchedAdminProfile = adminDocSnap.data() as AdminUser;
-          } else {
-             const defaultAdminName = user.displayName || user.email?.split('@')[0] || 'Admin';
-             const defaultCompanyName = `${defaultAdminName}'s Company`;
+          let adminDocSnap = await getDoc(adminUserRef);
+
+          if (!adminDocSnap.exists()) {
+            console.log(`Admin profile for ${user.uid} not found. Creating one.`);
+            const defaultAdminName = user.displayName || user.email?.split('@')[0] || 'Admin User';
+            const defaultCompanyNameForAdmin = `${defaultAdminName}'s Company`; // Used for admin's companyName field
             const newAdminProfileData: Omit<AdminUser, 'id' | 'createdAt' | 'updatedAt'> = {
               companyId: currentCompanyId,
-              companyName: defaultCompanyName,
+              companyName: defaultCompanyNameForAdmin, // This is AdminUser.companyName
               name: defaultAdminName,
               email: user.email || "",
               emailVerified: user.emailVerified,
               role: 'Owner',
               status: 'Active',
             };
-            await setDoc(adminUserRef, {
-              ...newAdminProfileData,
+            await setDoc(adminUserRef, { ...newAdminProfileData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            adminDocSnap = await getDoc(adminUserRef); // Re-fetch after creation
+          }
+          fetchedAdminProfile = adminDocSnap.data() as AdminUser; 
+          setCurrentUser({ ...user, adminProfile: fetchedAdminProfile });
+
+          // Fetch-or-create Company Profile
+          const companyRef = doc(db, "companies", currentCompanyId);
+          let companyDocSnap = await getDoc(companyRef);
+
+          if (!companyDocSnap.exists()) {
+            console.warn(`Company profile for ${currentCompanyId} not found. Creating one.`);
+            const companyNameToSet = fetchedAdminProfile?.companyName || `${fetchedAdminProfile?.name || 'Business'}'s Company`;
+            const newCompanyProfileData: CompanyProfile = {
+              id: currentCompanyId,
+              name: companyNameToSet,
+              activePlanId: DEFAULT_INITIAL_PLAN_ID_FOR_NEW_COMPANY,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            });
-            fetchedAdminProfile = {
-                id: user.uid,
-                ...newAdminProfileData,
-                createdAt: serverTimestamp(), 
-                updatedAt: serverTimestamp(),
             };
+            await setDoc(companyRef, newCompanyProfileData);
+            companyDocSnap = await getDoc(companyRef); // Re-fetch
           }
-          
-          setCurrentUser({ ...user, adminProfile: fetchedAdminProfile });
-          await fetchCompanyProfileData(currentCompanyId);
+
+          if (companyDocSnap.exists()) {
+            const companyData = companyDocSnap.data() as CompanyProfile;
+            setCompanyProfile(companyData);
+            setActivePlanId(companyData.activePlanId || LOWEST_TIER_PLAN_ID);
+          } else {
+            console.error(`CRITICAL: Company profile for ${currentCompanyId} still not found after attempting creation.`);
+            setCompanyProfile(null); // Should ideally not happen
+            setActivePlanId(LOWEST_TIER_PLAN_ID);
+          }
 
           // Prefetch initial data for dashboard lists
-          Promise.all([
-            fetchAndCacheStaff(currentCompanyId), // Fetches first page for staff
+          Promise.allSettled([
+            fetchAndCacheStaff(currentCompanyId), 
             fetchAndCacheTeams(currentCompanyId),
             fetchAndCacheAdmins(currentCompanyId),
             fetchAndCacheRoles(currentCompanyId),
-          ]).catch(cacheError => {
-            console.error("Error during initial data prefetch:", cacheError);
+          ]).then(results => {
+            results.forEach(result => {
+              if (result.status === 'rejected') console.error("Error during initial data prefetch:", result.reason);
+            });
           }).finally(() => {
             setIsInitialDataLoaded(true);
           });
 
         } catch (error: any) {
             console.error("Error fetching user/company data during auth state change:", error);
-            setCurrentUser({ ...user, adminProfile: undefined });
+            setCurrentUser(user ? { ...user, adminProfile: undefined } : null); // Keep user if auth error wasn't fatal to user obj
             setCompanyProfile(null);
             setActivePlanId(LOWEST_TIER_PLAN_ID);
-            setIsInitialDataLoaded(true);
+            setIsInitialDataLoaded(true); // Mark as loaded even on error to unblock UI
              if (error.code === 'permission-denied') {
                 showToast("Permission Denied", "Failed to initialize user data. Check Firestore rules.", "destructive");
             }
@@ -226,19 +258,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setCurrentUser(null);
         setCompanyId(null);
-        setCompanyProfile(null);
-        setActivePlanId(null);
-        setStaffListCache(null);
-        setTeamsListCache(null);
-        setAdminListCache(null);
-        setRolesListCache(null);
-        setIsInitialDataLoaded(true);
+        // CompanyProfile, activePlanId, caches are already cleared at the top of the effect for any auth change.
+        setIsInitialDataLoaded(true); // No user, so initial data (none) is considered loaded.
       }
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [fetchCompanyProfileData, fetchAndCacheStaff, fetchAndCacheTeams, fetchAndCacheAdmins, fetchAndCacheRoles]);
+  // Removed fetchCompanyProfileData from deps as its definition is stable with useCallback and no external deps.
+  // The other fetchAndCache functions are also stable due to useCallback.
+  }, [fetchAndCacheStaff, fetchAndCacheTeams, fetchAndCacheAdmins, fetchAndCacheRoles]); 
 
   return (
     <AuthContext.Provider value={{ 

@@ -9,20 +9,20 @@ export interface StaffCardData {
   name: string;
   title: string;
   companyName?: string;
-  companyLogoUrl?: string;
+  companyLogoUrl?: string; // Can be a URL or dataURI
   phone?: string;
   email: string;
   website?: string;
   linkedin?: string;
   address?: string;
-  profilePictureUrl?: string;
-  cardBackgroundUrl?: string;
+  profilePictureUrl?: string; // Can be a URL or dataURI
+  cardBackgroundUrl?: string; // Can be a URL or dataURI
   userInfo?: string;
   targetAudience?: string;
 }
 
 export interface CardDesignSettings {
-  template: string;
+  template: string; // ID of the AppCardTemplate used
   layout: 'image-left' | 'image-right' | 'image-top';
   colorScheme: {
     cardBackground: string;
@@ -30,14 +30,14 @@ export interface CardDesignSettings {
     primaryColor: string;
   };
   qrCodeUrl: string;
-  aiHint?: string;
+  aiHint?: string; // For AI-generated background suggestions
 }
 
 // Represents an Organization/Company in Firebase
 export interface CompanyProfile {
   id: string;
   name: string;
-  logoUrl?: string;
+  logoUrl?: string; // dataURI or URL from storage
   industry?: string;
   size?: string;
   website?: string;
@@ -68,31 +68,30 @@ export interface AdminUser {
 
 export type StaffRole = 'Employee' | 'Manager' | 'Contractor';
 export interface StaffRecord {
-  id: string;
+  id: string; // Firestore document ID
   name: string;
   email: string;
   role: StaffRole;
   teamId?: string;
   status: UserStatus;
-  fingerprintUrl: string;
-  uniqueNfcIdentifier?: string;
+  fingerprintUrl: string; // Unique URL segment for the public card
+  uniqueNfcIdentifier?: string; // For physical NFC card linking
   cardDisplayData: StaffCardData;
   designSettings: CardDesignSettings;
-  cardsCreatedCount?: number;
-  lastLoginAt?: Timestamp | string | null;
+  cardsCreatedCount?: number; // Tracked by admin, not directly by staff
+  lastLoginAt?: Timestamp | string | null; // Staff don't log in, but admins might track 'last viewed by staff' or similar
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
 
-export interface CardTemplateRecord { // Renamed from AppCardTemplate for clarity as Firestore record
+export interface CardTemplateRecord {
   id: string; // templateId
   name: string;
   description: string;
-  // Instead of full profile, maybe just core design and default fields
   designSettings: CardDesignSettings;
-  defaultFields?: Partial<StaffCardData>; // Example: pre-filled title for "Sales Template"
-  isPublic?: boolean; // Can general users use this template?
-  companyId?: string; // If it's a company-specific custom template
+  defaultFields?: Partial<StaffCardData>;
+  isPublic?: boolean;
+  companyId?: string;
   createdAt: Timestamp | string;
   updatedAt: Timestamp | string;
 }
@@ -100,7 +99,7 @@ export interface CardTemplateRecord { // Renamed from AppCardTemplate for clarit
 
 export interface AccessCode {
     code: string;
-    userId: string; // StaffId this code is for
+    staffMemberEmail: string; // Email of the staff member this code is for
     companyId: string;
     isUsed: boolean;
     expiresAt?: Timestamp | string;
@@ -117,19 +116,19 @@ export const defaultStaffCardData: StaffCardData = {
   website: '',
   linkedin: '',
   address: '',
-  profilePictureUrl: `https://placehold.co/120x120.png`,
+  profilePictureUrl: `https://placehold.co/120x120.png`, // Default placeholder
   cardBackgroundUrl: '',
   userInfo: '',
   targetAudience: '',
 };
 
 export const defaultCardDesignSettings: CardDesignSettings = {
-  template: 'tech-innovator', // Default to one of the new defined templates
+  template: 'tech-innovator',
   layout: 'image-left',
   colorScheme: {
-    cardBackground: '#1A202C',
-    textColor: '#E2E8F0',
-    primaryColor: '#3B82F6',
+    cardBackground: '#1A202C', // Dark Blue/Almost Black
+    textColor: '#E2E8F0',    // Light Gray
+    primaryColor: '#3B82F6', // Vibrant Blue
   },
   qrCodeUrl: '',
   aiHint: "tech abstract",
@@ -139,13 +138,13 @@ export interface Team {
   id: string;
   name: string;
   description: string;
-  managerId?: string;
-  managerName?: string;
+  managerId?: string | null; // Changed to allow null
+  managerName?: string | null; // Changed to allow null
   memberUserIds?: string[];
   memberCount?: number;
-  assignedTemplates?: AssignedTemplate[]; // Kept for potential use
-  teamMetrics?: TeamMetrics; // Kept for potential use
-  defaultTemplateId?: string; // Kept for potential use
+  assignedTemplates?: AssignedTemplate[];
+  teamMetrics?: TeamMetrics;
+  defaultTemplateId?: string;
   createdAt?: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
@@ -175,38 +174,30 @@ export interface TeamMember {
   averageSharesPerCard?: number;
 }
 
-
-export interface OrganizationUser { // General type if needed, can be admin or staff
-  id: string;
-  name: string;
-  email: string;
-  role?: StaffRole | AdminRole; // Combined for flexibility if ever needed
-}
-
 export interface ContactInfo {
-  id: string; // Firestore auto-ID
+  id: string;
   name: string;
   email: string;
   phone?: string;
   company?: string;
   message?: string;
-  submittedFromCardId?: string; // fingerprintUrl of the card it was submitted from
-  submittedToCompanyId?: string; // companyId that owns the card
+  submittedFromCardId?: string;
+  submittedToCompanyId?: string; // The companyId this contact belongs to
   submittedAt: Timestamp | string;
 }
 
-export interface Role { // For dashboard/roles page
+export interface Role {
   id: string;
   name: string;
   description: string;
-  permissions: RolePermission[]; // Simplified for now
-  companyId?: string; // To scope roles to a company
+  permissions: RolePermission[];
+  companyId: string;
   createdAt?: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
-export interface RolePermission { // Simplified
-  id: string; // e.g., 'manage_users', 'view_analytics'
-  name: string; // e.g., 'Manage Users'
+export interface RolePermission {
+  id: string;
+  name: string;
   description: string;
 }
 
@@ -214,15 +205,15 @@ export interface RolePermission { // Simplified
 export interface AppPlan {
   id: PlanId;
   name: string;
-  price: string;
-  priceMonthly: number;
-  currencySymbol: string;
-  frequency: string;
-  staffIncluded: string;
-  userLimit: number; // Max number of staff/users for this plan
+  price: string; // e.g., "R59", "Custom Quote"
+  priceMonthly: number; // numeric monthly price, -1 for custom
+  currencySymbol: string; // e.g., "R"
+  frequency: string; // e.g., "/ month"
+  staffIncluded: string; // e.g., "1 (Solo)", "Up to 5 Staff"
+  userLimit: number; // Max number of staff/users for this plan, Infinity for enterprise/custom
   features: string[];
-  extraStaffCost?: string;
-  extraStaffUnit?: string;
+  extraStaffCost?: string; // e.g., "R39"
+  extraStaffUnit?: string; // e.g., "/month each"
   isBusiness: boolean;
   popular?: boolean;
   description?: string;
@@ -230,7 +221,7 @@ export interface AppPlan {
 
 export const APP_PLANS: AppPlan[] = [
   {
-    id: 'free',
+    id: 'free', // "Starter" plan in your description
     name: 'Starter',
     price: 'R59',
     priceMonthly: 59,
@@ -239,11 +230,11 @@ export const APP_PLANS: AppPlan[] = [
     staffIncluded: '1 (Solo)',
     userLimit: 1,
     features: ['1 Digital card', 'QR/NFC sharing', 'Admin dashboard access', 'Basic templates', 'VCF download'],
-    isBusiness: false,
+    isBusiness: false, // This implies it's more for individuals
     description: "For solopreneurs and individuals needing a professional digital presence.",
   },
   {
-    id: 'starter',
+    id: 'starter', // "Business Starter" plan
     name: 'Business Starter',
     price: 'R249',
     priceMonthly: 249,
@@ -258,7 +249,7 @@ export const APP_PLANS: AppPlan[] = [
     description: "Designed for small businesses and teams looking to manage multiple digital cards.",
   },
   {
-    id: 'growth',
+    id: 'growth', // "Business Growth" plan
     name: 'Business Growth',
     price: 'R499',
     priceMonthly: 499,
@@ -277,12 +268,12 @@ export const APP_PLANS: AppPlan[] = [
     id: 'enterprise',
     name: 'Enterprise',
     price: 'Custom Quote',
-    priceMonthly: -1,
+    priceMonthly: -1, // Indicates custom pricing
     currencySymbol: 'R',
     frequency: '',
     staffIncluded: '20+ Staff',
-    userLimit: Infinity,
-    features: ['Everything in Growth', 'Unlimited staff (custom volume pricing)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
+    userLimit: Infinity, // Or a very high number
+    features: ['Everything in Growth', 'Unlimited staff (volume pricing)', 'SSO (Single Sign-On)', 'API & integrations', 'Dedicated onboarding & training', 'Service Level Agreement', 'Dedicated account manager', 'Custom features on request'],
     isBusiness: true,
     description: "Tailored solutions for large organizations with specific needs and high volume usage.",
   },
@@ -293,12 +284,21 @@ export const APP_PLANS: AppPlan[] = [
 // These serve as initial configurations when an admin might select a template
 // from the editor, not direct database records unless you choose to store them.
 
+export type AppCardTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  profile: StaffCardData;
+  design: CardDesignSettings;
+};
+
+
 /**
  * Template: Tech Innovator
  * Industry: Technology
  * Style: Modern, clean, dark theme with vibrant blue accents. Focus on social tech profiles.
  */
-export const techInnovatorTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const techInnovatorTemplate: AppCardTemplate = {
   id: 'tech-innovator',
   name: 'Tech Innovator',
   description: 'Sleek and modern, for the forward-thinking tech professional.',
@@ -306,14 +306,14 @@ export const techInnovatorTemplate: {id: string, name: string, description: stri
     name: 'Alex Turing',
     title: 'AI Research Lead',
     companyName: 'Innovate AI',
-    companyLogoUrl: `https://placehold.co/100x40.png`,
+    companyLogoUrl: `https://placehold.co/100x40.png`, // data-ai-hint="company logo" will be added in preview
     phone: '+1 555-0101',
     email: 'alex.turing@innovate.ai',
     website: 'innovate.ai/research',
     linkedin: 'linkedin.com/in/alexturingai',
     address: '1 Quantum Leap, Silicon Valley, CA',
-    profilePictureUrl: `https://placehold.co/120x120.png`,
-    cardBackgroundUrl: `https://placehold.co/600x900.png`,
+    profilePictureUrl: `https://placehold.co/120x120.png`, // data-ai-hint="person portrait"
+    cardBackgroundUrl: `https://placehold.co/600x900.png`, // data-ai-hint="tech abstract"
     userInfo: 'Pioneering new frontiers in machine learning and ethical AI development. Seeking collaborators for impactful projects.',
     targetAudience: 'AI researchers, tech investors, potential engineering talent.',
   },
@@ -335,7 +335,7 @@ export const techInnovatorTemplate: {id: string, name: string, description: stri
  * Industry: Legal
  * Style: Classic, authoritative, with gold and navy accents.
  */
-export const legalEagleTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const legalEagleTemplate: AppCardTemplate = {
   id: 'legal-eagle',
   name: 'Legal Eagle',
   description: 'Traditional and trustworthy, for legal professionals.',
@@ -372,7 +372,7 @@ export const legalEagleTemplate: {id: string, name: string, description: string,
  * Industry: Medical
  * Style: Clean, trustworthy, with calming blue and green tones.
  */
-export const healingHandsTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const healingHandsTemplate: AppCardTemplate = {
   id: 'healing-hands',
   name: 'Healing Hands',
   description: 'Calm and professional, for healthcare providers.',
@@ -409,7 +409,7 @@ export const healingHandsTemplate: {id: string, name: string, description: strin
  * Industry: Creative
  * Style: Vibrant, dynamic, allows for strong imagery.
  */
-export const creativeSparkTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const creativeSparkTemplate: AppCardTemplate = {
   id: 'creative-spark',
   name: 'Creative Spark',
   description: 'Bold and artistic, for designers, artists, and photographers.',
@@ -446,7 +446,7 @@ export const creativeSparkTemplate: {id: string, name: string, description: stri
  * Industry: Construction
  * Style: Rugged, dependable, with earthy tones.
  */
-export const solidFoundationTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const solidFoundationTemplate: AppCardTemplate = {
   id: 'solid-foundation',
   name: 'Solid Foundation',
   description: 'Strong and reliable, for construction and trades.',
@@ -484,7 +484,7 @@ export const solidFoundationTemplate: {id: string, name: string, description: st
  * Industry: Real Estate
  * Style: Elegant, inviting, focus on property.
  */
-export const dreamWeaverTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const dreamWeaverTemplate: AppCardTemplate = {
   id: 'dream-weaver',
   name: 'Dream Weaver',
   description: 'Polished and approachable, for real estate agents.',
@@ -521,7 +521,7 @@ export const dreamWeaverTemplate: {id: string, name: string, description: string
  * Industry: Hospitality
  * Style: Warm, friendly, service-oriented.
  */
-export const welcomeHostTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const welcomeHostTemplate: AppCardTemplate = {
   id: 'welcome-host',
   name: 'Welcome Host',
   description: 'Inviting and professional, for hospitality roles.',
@@ -558,7 +558,7 @@ export const welcomeHostTemplate: {id: string, name: string, description: string
  * Industry: Education
  * Style: Clean, accessible, focus on clarity.
  */
-export const knowledgeBuilderTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const knowledgeBuilderTemplate: AppCardTemplate = {
   id: 'knowledge-builder',
   name: 'Knowledge Builder',
   description: 'Clear and authoritative, for educators and academics.',
@@ -595,7 +595,7 @@ export const knowledgeBuilderTemplate: {id: string, name: string, description: s
  * Industry: Finance
  * Style: Secure, trustworthy, sophisticated.
  */
-export const financialAdvisorTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const financialAdvisorTemplate: AppCardTemplate = {
   id: 'financial-advisor',
   name: 'Financial Advisor',
   description: 'Professional and trustworthy, for finance experts.',
@@ -632,7 +632,7 @@ export const financialAdvisorTemplate: {id: string, name: string, description: s
  * Industry: Wellness
  * Style: Natural, calming, organic feel.
  */
-export const wellnessGuruTemplate: {id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings } = {
+export const wellnessGuruTemplate: AppCardTemplate = {
   id: 'wellness-guru',
   name: 'Wellness Guru',
   description: 'Calm and holistic, for wellness practitioners.',
@@ -665,7 +665,7 @@ export const wellnessGuruTemplate: {id: string, name: string, description: strin
 };
 
 // Array of all templates for use in the application
-export const APP_TEMPLATES: Array<{id: string, name: string, description: string, profile: StaffCardData, design: CardDesignSettings }> = [
+export const APP_TEMPLATES: AppCardTemplate[] = [
   techInnovatorTemplate,
   legalEagleTemplate,
   healingHandsTemplate,
