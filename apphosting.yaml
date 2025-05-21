@@ -2,6 +2,8 @@ runtime: nodejs22
 entrypoint: npm run start
 scaling:
   max_instances: 10
+build_env_variables:
+  GOOGLE_NODE_VERSION: "22"
 env:
   - variable: NODE_ENV
     value: production
