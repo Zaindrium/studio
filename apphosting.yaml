@@ -2,3 +2,5 @@ runtime: nodejs22
 entrypoint: npm run start
 scaling:
   max_instances: 10
+env:
+  NODE_ENV: production
