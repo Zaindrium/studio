@@ -3,11 +3,19 @@ entrypoint: npm run start
 scaling:
   max_instances: 10
 env:
-  NODE_ENV: production
-  NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyDOqtkQmCT-TOIxEZAfY6eaIG9wGPI7paI"
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "linkup-v9jfv.firebaseapp.com"
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "linkup-v9jfv"
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "linkup-v9jfv.firebasestorage.app"
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "48039785327"
-  NEXT_PUBLIC_FIREBASE_APP_ID: "1:48039785327:web:46b3dd05d3fc47b9fa6e9a"
-  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-7Q5C6LT1QV"
+  - variable: NODE_ENV
+    value: production
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyDOqtkQmCT-TOIxEZAfY6eaIG9wGPI7paI"
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "linkup-v9jfv.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "linkup-v9jfv"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "linkup-v9jfv.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "48039785327"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:48039785327:web:46b3dd05d3fc47b9fa6e9a"
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: "G-7Q5C6LT1QV"
